@@ -1,6 +1,6 @@
 import { db } from '@/lib/db';
-import { employees } from '@/lib/db/schema';
-import { asc } from 'drizzle-orm';
+import { employees, attendanceRecords, nteRecords } from '@/lib/db/schema';
+import { asc, notInArray } from 'drizzle-orm';
 
 export async function getAllEmployees() {
   return db.select().from(employees).orderBy(asc(employees.lastName));
@@ -64,4 +64,38 @@ export async function upsertEmployees(
       });
   }
   return parsed.length;
+}
+
+export async function replaceRoster(
+  parsed: {
+    employeeId: string;
+    firstName: string;
+    lastName: string;
+    middleName: string;
+    department: string;
+    immediateSupervisor: string;
+    approver2: string;
+    hireDate: string | null;
+  }[],
+): Promise<{ upserted: number; removed: number }> {
+  if (parsed.length === 0) return { upserted: 0, removed: 0 };
+
+  await upsertEmployees(parsed);
+
+  const keepIds = parsed.map((e) => e.employeeId);
+
+  const toRemove = await db
+    .select({ employeeId: employees.employeeId })
+    .from(employees)
+    .where(notInArray(employees.employeeId, keepIds));
+
+  if (toRemove.length > 0) {
+    const removeIds = toRemove.map((r) => r.employeeId);
+    await db.delete(attendanceRecords).where(notInArray(attendanceRecords.employeeId, keepIds));
+    await db.delete(nteRecords).where(notInArray(nteRecords.employeeId, keepIds));
+    await db.delete(employees).where(notInArray(employees.employeeId, keepIds));
+    return { upserted: parsed.length, removed: removeIds.length };
+  }
+
+  return { upserted: parsed.length, removed: 0 };
 }

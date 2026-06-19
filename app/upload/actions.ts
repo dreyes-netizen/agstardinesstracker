@@ -2,13 +2,13 @@
 
 import { parseAttendanceSheet } from '@/lib/parsers/attendance';
 import { parseRosterSheet } from '@/lib/parsers/roster';
-import { upsertEmployees } from '@/lib/queries/employees';
+import { replaceRoster } from '@/lib/queries/employees';
 import { replaceAttendancePeriod, recordUpload } from '@/lib/queries/attendance';
 
 export interface UploadResult {
   success: boolean;
   attendanceSummary?: { period: string; employees: number; records: number };
-  rosterSummary?: { employees: number };
+  rosterSummary?: { employees: number; removed: number };
   error?: string;
 }
 
@@ -23,8 +23,8 @@ export async function uploadFiles(formData: FormData): Promise<UploadResult> {
     if (rosterFile && rosterFile.size > 0) {
       const buffer = Buffer.from(await rosterFile.arrayBuffer());
       const parsed = parseRosterSheet(buffer);
-      await upsertEmployees(parsed);
-      rosterSummary = { employees: parsed.length };
+      const { upserted, removed } = await replaceRoster(parsed);
+      rosterSummary = { employees: upserted, removed };
     }
 
     if (attendanceFile && attendanceFile.size > 0) {
