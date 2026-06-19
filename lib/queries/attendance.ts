@@ -56,9 +56,9 @@ export async function getMonthlyStats(filters: DashboardFilters): Promise<Employ
       ON e.employee_id = n.employee_id
       AND n.month = ${monthStr}
     WHERE
-      (${filters.department ?? null} IS NULL OR e.department = ${filters.department ?? null})
-      AND (${filters.immediateSupervisor ?? null} IS NULL OR e.immediate_supervisor = ${filters.immediateSupervisor ?? null})
-      AND (${filters.approver2 ?? null} IS NULL OR e.approver2 = ${filters.approver2 ?? null})
+      (${filters.department ?? null}::text IS NULL OR e.department = ${filters.department ?? null}::text)
+      AND (${filters.immediateSupervisor ?? null}::text IS NULL OR e.immediate_supervisor = ${filters.immediateSupervisor ?? null}::text)
+      AND (${filters.approver2 ?? null}::text IS NULL OR e.approver2 = ${filters.approver2 ?? null}::text)
     GROUP BY e.employee_id, e.first_name, e.last_name, e.middle_name,
              e.department, e.immediate_supervisor, e.approver2,
              n.id, n.status, n.issued_date, n.issued_by, n.acknowledged_date
