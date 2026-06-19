@@ -32,7 +32,7 @@ export async function uploadFiles(formData: FormData): Promise<UploadResult> {
       const result = parseAttendanceSheet(buffer);
 
       // Upsert any employees found in attendance that aren't in the roster yet
-      const minimalEmployees = [...new Set(result.records.map(r => r.employeeId))].map(id => ({
+      const minimalEmployees = Array.from(new Set(result.records.map(r => r.employeeId))).map(id => ({
         employeeId: id,
         firstName: '',
         lastName: id,

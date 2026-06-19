@@ -10,7 +10,7 @@ export default async function NtePage() {
         <h1 className="text-2xl font-semibold text-app-text tracking-tight">NTE Management</h1>
         <p className="text-[14px] text-muted mt-1.5">Employees who have crossed the tardiness threshold. Issue and track NTE documents here.</p>
       </div>
-      <NteTable rows={rows as Parameters<typeof NteTable>[0]['rows']} />
+      <NteTable rows={rows as unknown as Parameters<typeof NteTable>[0]['rows']} />
     </div>
   );
 }

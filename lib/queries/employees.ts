@@ -16,9 +16,9 @@ export async function getFilterOptions() {
     .from(employees)
     .orderBy(asc(employees.department));
 
-  const departments = [...new Set(rows.map((r) => r.department).filter(Boolean))] as string[];
-  const supervisors = [...new Set(rows.map((r) => r.immediateSupervisor).filter(Boolean))] as string[];
-  const managers = [...new Set(rows.map((r) => r.approver2).filter(Boolean))] as string[];
+  const departments = Array.from(new Set(rows.map((r) => r.department).filter(Boolean))) as string[];
+  const supervisors = Array.from(new Set(rows.map((r) => r.immediateSupervisor).filter(Boolean))) as string[];
+  const managers = Array.from(new Set(rows.map((r) => r.approver2).filter(Boolean))) as string[];
 
   return { departments, supervisors, managers };
 }
