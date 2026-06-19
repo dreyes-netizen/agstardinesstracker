@@ -19,21 +19,26 @@ export interface AttendanceParseResult {
   employeeCount: number;
 }
 
-const DAY_ABBREVS = new Set(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
-
-function isDateLike(val: unknown): val is Date | number {
+function isDateLike(val: unknown): boolean {
   if (val instanceof Date) return !isNaN(val.getTime());
   if (typeof val === 'number') return val > 40000 && val < 60000;
+  if (typeof val === 'string') {
+    return /^\d{4}-\d{2}-\d{2}$/.test(val) || /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(val);
+  }
   return false;
 }
 
-function toISODate(val: Date | number): string {
+function toISODate(val: Date | number | string): string {
+  if (typeof val === 'string') {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
+    // MM/DD/YYYY
+    const p = val.split('/');
+    return `${p[2]}-${p[0].padStart(2, '0')}-${p[1].padStart(2, '0')}`;
+  }
   let d: Date;
   if (val instanceof Date) {
-    // Subtract offset to recover the local date that XLSX stored (getTimezoneOffset is negated for east-of-UTC zones)
     d = new Date(val.getTime() - val.getTimezoneOffset() * 60000);
   } else {
-    // Excel serial → JS Date (accounts for Lotus 1-2-3 bug at 60)
     d = new Date((val - 25569) * 86400 * 1000);
   }
   return d.toISOString().split('T')[0];
@@ -79,8 +84,6 @@ export function parseAttendanceSheet(buffer: Buffer): AttendanceParseResult {
 
     if (!currentEmployeeId) continue;
     if (!isDateLike(row[0])) continue;
-    const dayStr = row[1] != null ? String(row[1]).trim() : '';
-    if (!DAY_ABBREVS.has(dayStr)) continue;
 
     const shiftSchedule = row[3] != null ? String(row[3]) : '';
     if (shiftSchedule.toUpperCase().includes('REST DAY')) continue;
