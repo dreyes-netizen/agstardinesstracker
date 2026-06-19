@@ -38,3 +38,5 @@ next-env.d.ts
 # sample/uploaded Excel files (may contain real employee data)
 *.xlsx
 *.xls
+
+.vercel

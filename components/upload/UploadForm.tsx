@@ -35,7 +35,7 @@ export function UploadForm() {
           className="block w-full text-[13px] text-app-text file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-[12px] file:font-semibold file:bg-navy file:text-white hover:file:bg-navy/90 cursor-pointer"
         />
         <p className="text-[11.5px] text-muted">
-          Upload to add or update the employee list. File from Sprout: Employee List Report.
+          Replaces the employee list. Agents not in the file will be removed along with their records. File from Sprout: Employee List Report.
         </p>
       </div>
 
@@ -69,7 +69,10 @@ export function UploadForm() {
             <div className="space-y-1">
               <p className="font-semibold">Upload complete</p>
               {result.rosterSummary && (
-                <p>Roster: {result.rosterSummary.employees} employees updated</p>
+                <p>
+                  Roster: {result.rosterSummary.employees} employees updated
+                  {result.rosterSummary.removed > 0 && `, ${result.rosterSummary.removed} removed`}
+                </p>
               )}
               {result.attendanceSummary && (
                 <p>
