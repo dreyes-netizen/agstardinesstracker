@@ -1,0 +1,161 @@
+import { db } from '@/lib/db';
+import { attendanceRecords, employees, nteRecords, uploadHistory } from '@/lib/db/schema';
+import { and, eq, sql } from 'drizzle-orm';
+import { computeNteStatus, NteStatus } from '@/lib/utils/nte-status';
+
+export interface EmployeeMonthlyStats {
+  employeeId: string;
+  firstName: string;
+  lastName: string;
+  middleName: string | null;
+  department: string | null;
+  immediateSupervisor: string | null;
+  approver2: string | null;
+  lateCount: number;
+  accumulatedMinutes: number;
+  nteStatus: NteStatus;
+  nteRecordId: number | null;
+  issuedDate: string | null;
+  issuedBy: string | null;
+  acknowledgedDate: string | null;
+}
+
+export interface DashboardFilters {
+  year: number;
+  month: number;       // 1-12
+  department?: string;
+  immediateSupervisor?: string;
+  approver2?: string;
+}
+
+export async function getMonthlyStats(filters: DashboardFilters): Promise<EmployeeMonthlyStats[]> {
+  const monthStr = `${filters.year}-${String(filters.month).padStart(2, '0')}`;
+
+  const rows = await db.execute(sql`
+    SELECT
+      e.employee_id,
+      e.first_name,
+      e.last_name,
+      e.middle_name,
+      e.department,
+      e.immediate_supervisor,
+      e.approver2,
+      COUNT(CASE WHEN a.late_minutes > 0 THEN 1 END)::int AS late_count,
+      COALESCE(SUM(a.late_minutes), 0)::int AS accumulated_minutes,
+      n.id AS nte_record_id,
+      n.status AS nte_db_status,
+      n.issued_date,
+      n.issued_by,
+      n.acknowledged_date
+    FROM employees e
+    LEFT JOIN attendance_records a
+      ON e.employee_id = a.employee_id
+      AND EXTRACT(YEAR FROM a.date::date) = ${filters.year}
+      AND EXTRACT(MONTH FROM a.date::date) = ${filters.month}
+    LEFT JOIN nte_records n
+      ON e.employee_id = n.employee_id
+      AND n.month = ${monthStr}
+    WHERE
+      (${filters.department ?? null} IS NULL OR e.department = ${filters.department ?? null})
+      AND (${filters.immediateSupervisor ?? null} IS NULL OR e.immediate_supervisor = ${filters.immediateSupervisor ?? null})
+      AND (${filters.approver2 ?? null} IS NULL OR e.approver2 = ${filters.approver2 ?? null})
+    GROUP BY e.employee_id, e.first_name, e.last_name, e.middle_name,
+             e.department, e.immediate_supervisor, e.approver2,
+             n.id, n.status, n.issued_date, n.issued_by, n.acknowledged_date
+    ORDER BY
+      CASE n.status
+        WHEN 'required' THEN 1
+        WHEN 'issued'   THEN 2
+        ELSE 3
+      END,
+      late_count DESC
+  `);
+
+  return (rows.rows as Record<string, unknown>[]).map((row) => {
+    const lateCount = Number(row.late_count) || 0;
+    const accumulatedMinutes = Number(row.accumulated_minutes) || 0;
+    const dbStatus = (row.nte_db_status as 'required' | 'issued' | 'acknowledged' | null) ?? null;
+
+    return {
+      employeeId: String(row.employee_id),
+      firstName: String(row.first_name),
+      lastName: String(row.last_name),
+      middleName: row.middle_name ? String(row.middle_name) : null,
+      department: row.department ? String(row.department) : null,
+      immediateSupervisor: row.immediate_supervisor ? String(row.immediate_supervisor) : null,
+      approver2: row.approver2 ? String(row.approver2) : null,
+      lateCount,
+      accumulatedMinutes,
+      nteStatus: computeNteStatus(lateCount, accumulatedMinutes, dbStatus),
+      nteRecordId: row.nte_record_id ? Number(row.nte_record_id) : null,
+      issuedDate: row.issued_date ? String(row.issued_date) : null,
+      issuedBy: row.issued_by ? String(row.issued_by) : null,
+      acknowledgedDate: row.acknowledged_date ? String(row.acknowledged_date) : null,
+    };
+  });
+}
+
+export async function getEmployeeLateRecords(employeeId: string, year: number, month: number) {
+  return db
+    .select()
+    .from(attendanceRecords)
+    .where(
+      and(
+        eq(attendanceRecords.employeeId, employeeId),
+        sql`EXTRACT(YEAR FROM ${attendanceRecords.date}::date) = ${year}`,
+        sql`EXTRACT(MONTH FROM ${attendanceRecords.date}::date) = ${month}`,
+        sql`${attendanceRecords.lateMinutes} > 0`,
+      ),
+    )
+    .orderBy(attendanceRecords.date);
+}
+
+export async function replaceAttendancePeriod(
+  periodStart: string,
+  periodEnd: string,
+  records: {
+    employeeId: string;
+    date: string;
+    lateMinutes: number;
+    undertimeMinutes: number;
+    shiftType: string;
+    shiftSchedule: string;
+    actualLogs: string;
+  }[],
+) {
+  await db
+    .delete(attendanceRecords)
+    .where(
+      and(
+        eq(attendanceRecords.reportPeriodStart, periodStart),
+        eq(attendanceRecords.reportPeriodEnd, periodEnd),
+      ),
+    );
+
+  if (records.length > 0) {
+    await db.insert(attendanceRecords).values(
+      records.map((r) => ({
+        employeeId: r.employeeId,
+        date: r.date,
+        lateMinutes: r.lateMinutes,
+        undertimeMinutes: r.undertimeMinutes,
+        shiftType: r.shiftType || null,
+        shiftSchedule: r.shiftSchedule || null,
+        actualLogs: r.actualLogs || null,
+        reportPeriodStart: periodStart,
+        reportPeriodEnd: periodEnd,
+      })),
+    );
+  }
+
+  return records.length;
+}
+
+export async function recordUpload(
+  filename: string,
+  periodStart: string,
+  periodEnd: string,
+  recordCount: number,
+) {
+  await db.insert(uploadHistory).values({ filename, periodStart, periodEnd, recordCount });
+}
