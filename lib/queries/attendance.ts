@@ -133,19 +133,21 @@ export async function replaceAttendancePeriod(
     );
 
   if (records.length > 0) {
-    await db.insert(attendanceRecords).values(
-      records.map((r) => ({
-        employeeId: r.employeeId,
-        date: r.date,
-        lateMinutes: r.lateMinutes,
-        undertimeMinutes: r.undertimeMinutes,
-        shiftType: r.shiftType || null,
-        shiftSchedule: r.shiftSchedule || null,
-        actualLogs: r.actualLogs || null,
-        reportPeriodStart: periodStart,
-        reportPeriodEnd: periodEnd,
-      })),
-    );
+    const BATCH = 500;
+    const mapped = records.map((r) => ({
+      employeeId: r.employeeId,
+      date: r.date,
+      lateMinutes: r.lateMinutes,
+      undertimeMinutes: r.undertimeMinutes,
+      shiftType: r.shiftType || null,
+      shiftSchedule: r.shiftSchedule || null,
+      actualLogs: r.actualLogs ? r.actualLogs.slice(0, 500) : null,
+      reportPeriodStart: periodStart,
+      reportPeriodEnd: periodEnd,
+    }));
+    for (let i = 0; i < mapped.length; i += BATCH) {
+      await db.insert(attendanceRecords).values(mapped.slice(i, i + BATCH));
+    }
   }
 
   return records.length;
