@@ -2,7 +2,7 @@
 
 import { parseAttendanceSheet } from '@/lib/parsers/attendance';
 import { parseRosterSheet } from '@/lib/parsers/roster';
-import { replaceRoster } from '@/lib/queries/employees';
+import { replaceRoster, upsertEmployees } from '@/lib/queries/employees';
 import { replaceAttendancePeriod, recordUpload } from '@/lib/queries/attendance';
 
 export interface UploadResult {
