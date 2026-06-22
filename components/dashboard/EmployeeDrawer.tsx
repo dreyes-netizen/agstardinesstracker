@@ -27,14 +27,17 @@ function getDay(dateStr: string) {
 
 export function EmployeeDrawer({ employee, year, month, onClose, onNteAction }: EmployeeDrawerProps) {
   const [lateRecords, setLateRecords] = useState<LateRecord[]>([]);
+  const [loading, setLoading] = useState(false);
   const monthStr = `${year}-${String(month).padStart(2, '0')}`;
 
   useEffect(() => {
     if (!employee) { setLateRecords([]); return; }
+    setLoading(true);
     fetch(`/api/employee/${employee.employeeId}/lates?year=${year}&month=${month}`)
       .then((r) => r.json())
       .then((data: LateRecord[]) => setLateRecords(data))
-      .catch(() => setLateRecords([]));
+      .catch(() => setLateRecords([]))
+      .finally(() => setLoading(false));
   }, [employee, year, month]);
 
   if (!employee) return null;
@@ -43,9 +46,9 @@ export function EmployeeDrawer({ employee, year, month, onClose, onNteAction }: 
 
   return (
     <Sheet open={!!employee} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <SheetContent side="right" className="w-[400px] p-0 flex flex-col overflow-hidden">
+      <SheetContent side="right" className="w-[400px] p-0 flex flex-col overflow-hidden bg-white">
         <div className="bg-navy px-[22px] py-5 flex-shrink-0">
-          <p className="font-mono text-[11px] tracking-[0.12em] text-white/45 mb-1">
+          <p className="font-mono text-[11px] tracking-[0.12em] text-white/70 mb-1">
             ID #{employee.employeeId} · {employee.department ?? 'No dept'}
           </p>
           <p className="text-[17px] font-semibold text-white tracking-tight">{fullName}</p>
@@ -61,7 +64,7 @@ export function EmployeeDrawer({ employee, year, month, onClose, onNteAction }: 
 
         <div className="flex-1 overflow-y-auto">
           <div className="px-[22px] py-4 border-b border-border">
-            <p className="font-mono text-[10px] tracking-[0.12em] uppercase text-muted mb-3">
+            <p className="text-[11px] font-semibold text-muted mb-3">
               {new Date(`${monthStr}-01`).toLocaleDateString('en-PH', { month: 'long', year: 'numeric' })} — Totals
             </p>
             <div className="flex gap-4">
@@ -77,8 +80,18 @@ export function EmployeeDrawer({ employee, year, month, onClose, onNteAction }: 
           </div>
 
           <div className="px-[22px] py-4 border-b border-border">
-            <p className="font-mono text-[10px] tracking-[0.12em] uppercase text-muted mb-3">Late Dates</p>
-            {lateRecords.length === 0 ? (
+            <p className="text-[11px] font-semibold text-muted mb-3">Late Dates</p>
+            {loading ? (
+              <div className="animate-pulse space-y-2">
+                {[72, 56, 64, 48].map((w) => (
+                  <div key={w} className="flex items-center gap-3 py-1.5">
+                    <div className="h-3 bg-ground rounded" style={{ width: `${w}px` }} />
+                    <div className="h-3 bg-ground rounded w-8" />
+                    <div className="h-3 bg-ground rounded w-10 ml-auto" />
+                  </div>
+                ))}
+              </div>
+            ) : lateRecords.length === 0 ? (
               <p className="text-[12.5px] text-muted">No late records for this month.</p>
             ) : (
               <table className="w-full">
@@ -106,7 +119,7 @@ export function EmployeeDrawer({ employee, year, month, onClose, onNteAction }: 
 
           {['required', 'issued', 'acknowledged'].includes(employee.nteStatus) && (
             <div className="px-[22px] py-4">
-              <p className="font-mono text-[10px] tracking-[0.12em] uppercase text-muted mb-3">NTE Action</p>
+              <p className="text-[11px] font-semibold text-muted mb-3">NTE Action</p>
               <NteForm
                 employeeId={employee.employeeId}
                 month={monthStr}

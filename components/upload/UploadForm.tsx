@@ -1,28 +1,50 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { uploadFiles, UploadResult } from '@/app/upload/actions';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+
+interface UploadResult {
+  success: boolean;
+  attendanceSummary?: { period: string; employees: number; records: number };
+  rosterSummary?: { employees: number; removed: number };
+  error?: string;
+}
 
 export function UploadForm() {
   const [result, setResult] = useState<UploadResult | null>(null);
   const [loading, setLoading] = useState(false);
-  const formRef = useRef<HTMLFormElement>(null);
+  const resultRef = useRef<HTMLDivElement>(null);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+
+    const formData = new FormData(e.currentTarget);
+    const attendance = formData.get('attendance') as File | null;
+    const roster = formData.get('roster') as File | null;
+
+    if ((!attendance || attendance.size === 0) && (!roster || roster.size === 0)) {
+      setResult({ success: false, error: 'Please select at least one file before uploading.' });
+      return;
+    }
+
     setLoading(true);
     setResult(null);
-    const formData = new FormData(e.currentTarget);
-    const res = await uploadFiles(formData);
-    setResult(res);
-    setLoading(false);
-    if (res.success) formRef.current?.reset();
+
+    try {
+      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      const data: UploadResult = await res.json();
+      setResult(data);
+    } catch {
+      setResult({ success: false, error: 'Network error — please try again.' });
+    } finally {
+      setLoading(false);
+      setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
+    }
   }
 
   return (
-    <form ref={formRef} onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-2">
         <Label htmlFor="roster" className="text-[12px] font-semibold uppercase tracking-[0.06em] text-muted">
           Employee Roster (.xls)
@@ -35,8 +57,28 @@ export function UploadForm() {
           className="block w-full text-[13px] text-app-text file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-[12px] file:font-semibold file:bg-navy file:text-white hover:file:bg-navy/90 cursor-pointer"
         />
         <p className="text-[11.5px] text-muted">
-          Replaces the employee list. Agents not in the file will be removed along with their records. File from Sprout: Employee List Report.
+          Replaces the employee list. Agents not in the file will be removed along with their records. File from Sprout: <span className="font-medium text-app-text">Employee List Report</span>.
         </p>
+        <div className="mt-2">
+          <p className="text-[11px] font-semibold text-muted uppercase tracking-[0.06em] mb-1.5">Required columns</p>
+          <div className="flex flex-wrap gap-1.5">
+            {[
+              { label: 'Employee ID', note: 'e.g. ID Number' },
+              { label: 'Last Name' },
+              { label: 'First Name' },
+              { label: 'Middle Name' },
+              { label: 'Department' },
+              { label: 'Immediate Supervisor' },
+              { label: 'Approver 2', note: 'or Manager' },
+              { label: 'Hire Date', note: 'optional' },
+            ].map(({ label, note }) => (
+              <span key={label} className="inline-flex items-center gap-1 bg-ground border border-border rounded-[4px] px-2 py-0.5 text-[11px] text-app-text font-mono">
+                {label}
+                {note && <span className="text-muted font-sans">· {note}</span>}
+              </span>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="space-y-2">
@@ -64,10 +106,17 @@ export function UploadForm() {
       </Button>
 
       {result && (
-        <div className={`rounded-[5px] border p-4 text-[13px] ${result.success ? 'border-safe-green/30 bg-safe-green/[0.06] text-safe-green' : 'border-nte-red/30 bg-nte-red/[0.06] text-nte-red'}`}>
+        <div
+          ref={resultRef}
+          className={`rounded-[6px] border-2 p-4 text-[13px] ${
+            result.success
+              ? 'border-safe-green bg-safe-green text-white'
+              : 'border-nte-red bg-nte-red text-white'
+          }`}
+        >
           {result.success ? (
             <div className="space-y-1">
-              <p className="font-semibold">Upload complete</p>
+              <p className="font-bold text-[14px]">Upload complete</p>
               {result.rosterSummary && (
                 <p>
                   Roster: {result.rosterSummary.employees} employees updated
@@ -82,7 +131,7 @@ export function UploadForm() {
               )}
             </div>
           ) : (
-            <p><span className="font-semibold">Error:</span> {result.error}</p>
+            <p><span className="font-bold">Error:</span> {result.error}</p>
           )}
         </div>
       )}

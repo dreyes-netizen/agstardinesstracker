@@ -2,15 +2,15 @@ import { Employee } from '@/lib/db/schema';
 
 export function RosterTable({ employees }: { employees: Employee[] }) {
   return (
-    <div className="bg-white border border-border rounded-[7px] overflow-hidden">
-      <div className="px-5 py-3.5 border-b border-border flex items-center justify-between">
+    <div className="bg-white border border-border rounded-[7px] overflow-clip flex flex-col flex-1 min-h-0">
+      <div className="px-5 py-3.5 border-b border-border flex items-center justify-between flex-shrink-0">
         <span className="text-[13.5px] font-semibold text-app-text">All Employees</span>
         <span className="text-[11.5px] text-muted">{employees.length} employees</span>
       </div>
-      <div className="overflow-x-auto">
+      <div className="overflow-auto flex-1 min-h-0">
         <table className="w-full border-collapse">
-          <thead>
-            <tr className="bg-ground border-b border-border">
+          <thead className="sticky top-0 z-10 bg-ground">
+            <tr className="border-b border-border">
               {['Employee ID', 'Name', 'Department', 'Immediate Supervisor', 'Manager (Approver 2)', 'Hire Date'].map((h) => (
                 <th key={h} className="px-4 py-2.5 text-left font-mono text-[10px] tracking-[0.09em] uppercase text-muted first:pl-5 last:pr-5 whitespace-nowrap">{h}</th>
               ))}

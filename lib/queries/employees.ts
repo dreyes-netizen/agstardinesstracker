@@ -1,6 +1,14 @@
 import { db } from '@/lib/db';
 import { employees, attendanceRecords, nteRecords } from '@/lib/db/schema';
-import { asc, notInArray } from 'drizzle-orm';
+import { asc, notInArray, sql } from 'drizzle-orm';
+
+export async function getLastRosterUpdate(): Promise<string | null> {
+  const result = await db.execute(
+    sql`SELECT MAX(updated_at)::text AS last_updated FROM employees`
+  );
+  const row = result.rows[0] as { last_updated: string | null };
+  return row?.last_updated ?? null;
+}
 
 export async function getAllEmployees() {
   return db.select().from(employees).orderBy(asc(employees.lastName));
@@ -20,7 +28,16 @@ export async function getFilterOptions() {
   const supervisors = Array.from(new Set(rows.map((r) => r.immediateSupervisor).filter(Boolean))) as string[];
   const managers = Array.from(new Set(rows.map((r) => r.approver2).filter(Boolean))) as string[];
 
-  return { departments, supervisors, managers };
+  // Raw combinations so FilterBar can cascade — filter supervisors/managers by dept client-side.
+  const combinations = rows
+    .filter((r) => r.department || r.immediateSupervisor || r.approver2)
+    .map((r) => ({
+      department: r.department ?? null,
+      supervisor: r.immediateSupervisor ?? null,
+      manager: r.approver2 ?? null,
+    }));
+
+  return { departments, supervisors, managers, combinations };
 }
 
 export async function upsertEmployees(

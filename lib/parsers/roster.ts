@@ -8,7 +8,7 @@ export interface ParsedEmployee {
   department: string;
   immediateSupervisor: string;
   approver2: string;
-  hireDate: string | null; // YYYY-MM-DD or null
+  hireDate: string | null;
 }
 
 function parseHireDate(val: unknown): string | null {
@@ -22,6 +22,34 @@ function parseHireDate(val: unknown): string | null {
   const d = new Date(str);
   if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
   return null;
+}
+
+// Maps a header cell string to a canonical field name.
+// Partial, case-insensitive matching so "Employee ID", "Emp ID", "ID Number" all resolve.
+const HEADER_MAP: Array<[RegExp, string]> = [
+  [/id.*(number|no|#)|employee.*id|emp.*id/i, 'employeeId'],
+  [/last.*name|surname/i,                     'lastName'],
+  [/middle.*name/i,                            'middleName'],
+  [/first.*name|given.*name/i,                 'firstName'],
+  [/department|dept/i,                          'department'],
+  [/immediate.*supervisor|supervisor/i,         'immediateSupervisor'],
+  [/approver.*2|manager|approver/i,             'approver2'],
+  [/hire.*date|date.*hired|start.*date/i,       'hireDate'],
+];
+
+function detectHeaders(row: unknown[]): Record<string, number> {
+  const map: Record<string, number> = {};
+  row.forEach((cell, i) => {
+    if (cell == null) return;
+    const text = String(cell).trim();
+    for (const [pattern, field] of HEADER_MAP) {
+      if (pattern.test(text) && !(field in map)) {
+        map[field] = i;
+        break;
+      }
+    }
+  });
+  return map;
 }
 
 export function parseRosterSheet(buffer: Buffer): ParsedEmployee[] {
@@ -38,22 +66,56 @@ export function parseRosterSheet(buffer: Buffer): ParsedEmployee[] {
     raw: true,
   });
 
+  // Find the header row — first row where we can detect at least 3 known fields
+  let headerRowIndex = -1;
+  let colMap: Record<string, number> = {};
+  for (let i = 0; i < Math.min(rows.length, 10); i++) {
+    const detected = detectHeaders(rows[i]);
+    if (Object.keys(detected).length >= 3) {
+      headerRowIndex = i;
+      colMap = detected;
+      break;
+    }
+  }
+
+  // Fall back to fixed column positions if header detection fails
+  if (headerRowIndex === -1) {
+    colMap = {
+      employeeId: 0,
+      lastName: 1,
+      middleName: 2,
+      firstName: 3,
+      department: 4,
+      immediateSupervisor: 5,
+      approver2: 6,
+      hireDate: 10,
+    };
+    headerRowIndex = 0;
+  }
+
   const employees: ParsedEmployee[] = [];
 
-  for (let i = 1; i < rows.length; i++) {
+  for (let i = headerRowIndex + 1; i < rows.length; i++) {
     const row = rows[i];
-    const employeeId = row[0] != null ? String(row[0]).trim() : '';
+    const get = (field: string) =>
+      colMap[field] !== undefined && row[colMap[field]] != null
+        ? String(row[colMap[field]]).trim()
+        : '';
+
+    const employeeId = get('employeeId');
     if (!employeeId) continue;
 
     employees.push({
       employeeId,
-      lastName: row[1] != null ? String(row[1]).trim() : '',
-      middleName: row[2] != null ? String(row[2]).trim() : '',
-      firstName: row[3] != null ? String(row[3]).trim() : '',
-      department: row[4] != null ? String(row[4]).trim() : '',
-      immediateSupervisor: row[5] != null ? String(row[5]).trim() : '',
-      approver2: row[6] != null ? String(row[6]).trim() : '',
-      hireDate: parseHireDate(row[10]),
+      lastName: get('lastName'),
+      middleName: get('middleName'),
+      firstName: get('firstName'),
+      department: get('department'),
+      immediateSupervisor: get('immediateSupervisor'),
+      approver2: get('approver2'),
+      hireDate: parseHireDate(
+        colMap['hireDate'] !== undefined ? row[colMap['hireDate']] : null,
+      ),
     });
   }
 

@@ -18,6 +18,13 @@ interface NteFormProps {
   onSuccess: () => void;
 }
 
+function fmtDate(raw: string | null): string {
+  if (!raw) return '—';
+  return new Date(raw + 'T00:00:00').toLocaleDateString('en-US', {
+    month: 'long', day: 'numeric', year: 'numeric',
+  });
+}
+
 export function NteForm({ employeeId, month, nteStatus, issuedDate, issuedBy, acknowledgedDate, notes, onSuccess }: NteFormProps) {
   const [issuedByInput, setIssuedByInput] = useState('');
   const [notesInput, setNotesInput] = useState('');
@@ -43,9 +50,9 @@ export function NteForm({ employeeId, month, nteStatus, issuedDate, issuedBy, ac
   if (nteStatus === 'acknowledged') {
     return (
       <div className="space-y-2 text-[12.5px] text-muted">
-        <p>NTE issued {issuedDate} by {issuedBy}</p>
+        <p>NTE issued <span className="font-medium text-app-text">{fmtDate(issuedDate)}</span> by <span className="font-medium text-app-text">{issuedBy ?? '—'}</span></p>
         {notes && <p>Notes: {notes}</p>}
-        <p className="text-safe-green font-medium">Acknowledged {acknowledgedDate}</p>
+        <p className="text-safe-green font-medium">Acknowledged {fmtDate(acknowledgedDate)}</p>
       </div>
     );
   }
@@ -54,7 +61,7 @@ export function NteForm({ employeeId, month, nteStatus, issuedDate, issuedBy, ac
     return (
       <div className="space-y-3">
         <div className="text-[12.5px] text-muted space-y-1">
-          <p>NTE issued {issuedDate} by <span className="font-medium text-app-text">{issuedBy}</span></p>
+          <p>NTE issued <span className="font-medium text-app-text">{fmtDate(issuedDate)}</span> by <span className="font-medium text-app-text">{issuedBy ?? '—'}</span></p>
           {notes && <p>Notes: {notes}</p>}
         </div>
         <Button onClick={handleAcknowledge} disabled={loading} variant="outline" className="w-full border-safe-green/40 text-safe-green hover:bg-safe-green/5">

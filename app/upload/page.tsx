@@ -1,12 +1,10 @@
 import { UploadForm } from '@/components/upload/UploadForm';
+import { ApiDocs } from '@/components/upload/ApiDocs';
 
 export default function UploadPage() {
   return (
     <div className="p-8 max-w-2xl">
       <div className="mb-8">
-        <p className="font-mono text-[10px] tracking-[0.14em] uppercase text-muted mb-1">
-          Upload
-        </p>
         <h1 className="text-2xl font-semibold text-app-text tracking-tight">
           Import reports
         </h1>
@@ -17,6 +15,10 @@ export default function UploadPage() {
 
       <div className="bg-white rounded-[7px] border border-border p-6">
         <UploadForm />
+      </div>
+
+      <div className="mt-4">
+        <ApiDocs />
       </div>
     </div>
   );

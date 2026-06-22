@@ -95,6 +95,67 @@ export async function getMonthlyStats(filters: DashboardFilters): Promise<Employ
   });
 }
 
+export interface DayOfWeekStat {
+  dow: number; // 0=Sun … 6=Sat (PostgreSQL EXTRACT DOW)
+  lateEmployees: number;
+}
+
+export async function getLateByDayOfWeek(filters: DashboardFilters): Promise<DayOfWeekStat[]> {
+  const needsJoin = !!(filters.department || filters.immediateSupervisor || filters.approver2);
+
+  const rows = await db.execute(sql`
+    SELECT
+      EXTRACT(DOW FROM a.date::date)::int AS dow,
+      COUNT(DISTINCT a.employee_id)::int  AS late_employees
+    FROM attendance_records a
+    ${needsJoin ? sql`
+      JOIN employees e ON a.employee_id = e.employee_id` : sql``}
+    WHERE a.late_minutes > 0
+      AND EXTRACT(YEAR  FROM a.date::date) = ${filters.year}
+      AND EXTRACT(MONTH FROM a.date::date) = ${filters.month}
+      ${needsJoin ? sql`
+      AND (${filters.department          ?? null}::text IS NULL OR e.department           = ${filters.department          ?? null}::text)
+      AND (${filters.immediateSupervisor ?? null}::text IS NULL OR e.immediate_supervisor = ${filters.immediateSupervisor ?? null}::text)
+      AND (${filters.approver2           ?? null}::text IS NULL OR e.approver2            = ${filters.approver2           ?? null}::text)` : sql``}
+    GROUP BY dow
+    ORDER BY dow
+  `);
+
+  return (rows.rows as { dow: number; late_employees: number }[]).map((r) => ({
+    dow: Number(r.dow),
+    lateEmployees: Number(r.late_employees),
+  }));
+}
+
+export async function getLatestAttendancePeriod(): Promise<{ year: number; month: number; latestDate: string | null } | null> {
+  const result = await db.execute(sql`
+    SELECT
+      EXTRACT(YEAR FROM MAX(date::date))::int  AS year,
+      EXTRACT(MONTH FROM MAX(date::date))::int AS month,
+      MAX(date::date)::text                    AS latest_date
+    FROM attendance_records
+  `);
+  if (!result.rows.length) return null;
+  const row = result.rows[0] as Record<string, unknown>;
+  if (!row.latest_date) return null;
+  return {
+    year: Number(row.year),
+    month: Number(row.month),
+    latestDate: String(row.latest_date),
+  };
+}
+
+export async function hasAttendanceData(year: number, month: number): Promise<boolean> {
+  const result = await db.execute(sql`
+    SELECT EXISTS (
+      SELECT 1 FROM attendance_records
+      WHERE EXTRACT(YEAR FROM date::date) = ${year}
+        AND EXTRACT(MONTH FROM date::date) = ${month}
+    ) AS has_data
+  `);
+  return (result.rows[0] as Record<string, unknown>).has_data === true;
+}
+
 export async function getEmployeeLateRecords(employeeId: string, year: number, month: number) {
   return db
     .select()
