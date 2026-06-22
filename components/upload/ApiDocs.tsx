@@ -125,8 +125,8 @@ export function ApiDocs() {
                       </tr>
                     </thead>
                     <tbody>
-                      <FieldRow name="roster" type="File" children="Sprout Employee List Report (.xls / .xlsx). Replaces the full roster — employees not present in the file are removed along with their attendance and NTE records." />
-                      <FieldRow name="attendance" type="File" children="Sprout Attendance Report, Detailed sheet (.xlsx). Replaces all records for the detected pay period and triggers NTE status sync for affected months." />
+                      <FieldRow name="roster" type="File">Sprout Employee List Report (.xls / .xlsx). Replaces the full roster — employees not present in the file are removed along with their attendance and NTE records.</FieldRow>
+                      <FieldRow name="attendance" type="File">Sprout Attendance Report, Detailed sheet (.xlsx). Replaces all records for the detected pay period and triggers NTE status sync for affected months.</FieldRow>
                     </tbody>
                   </table>
                 </div>

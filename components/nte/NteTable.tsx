@@ -156,7 +156,7 @@ export function NteTable({ rows }: { rows: NteRow[] }) {
                           Issued <span className="font-medium text-app-text">{fmtDate(row.issued_date)}</span>
                           {row.issued_by && <> by <span className="font-medium text-app-text">{row.issued_by}</span></>}
                         </div>
-                        {row.notes && <div className="text-[11px] text-muted italic">"{row.notes}"</div>}
+                        {row.notes && <div className="text-[11px] text-muted italic">&ldquo;{row.notes}&rdquo;</div>}
                         <Button size="sm" variant="outline" disabled={loading} className="text-[11px] border-safe-green/30 text-safe-green hover:bg-safe-green/5 h-7 px-3" onClick={() => handleAcknowledge(row.employee_id, row.month)}>
                           Mark Acknowledged
                         </Button>
