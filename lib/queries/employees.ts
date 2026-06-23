@@ -40,6 +40,25 @@ export async function getFilterOptions() {
   return { departments, supervisors, managers, combinations };
 }
 
+export async function insertMissingEmployees(employeeIds: string[]) {
+  if (employeeIds.length === 0) return;
+  for (const id of employeeIds) {
+    await db
+      .insert(employees)
+      .values({
+        employeeId: id,
+        firstName: '',
+        lastName: id,
+        middleName: null,
+        department: null,
+        immediateSupervisor: null,
+        approver2: null,
+        hireDate: null,
+      })
+      .onConflictDoNothing();
+  }
+}
+
 export async function upsertEmployees(
   parsed: {
     employeeId: string;

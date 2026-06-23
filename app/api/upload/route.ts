@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseAttendanceSheet } from '@/lib/parsers/attendance';
 import { parseRosterSheet } from '@/lib/parsers/roster';
-import { replaceRoster, upsertEmployees } from '@/lib/queries/employees';
+import { replaceRoster, insertMissingEmployees } from '@/lib/queries/employees';
 import { replaceAttendancePeriod, recordUpload } from '@/lib/queries/attendance';
 import { syncNteForMonth } from '@/lib/queries/nte';
 
@@ -36,17 +36,8 @@ export async function POST(req: NextRequest) {
       const buffer = Buffer.from(await attendanceFile.arrayBuffer());
       const result = parseAttendanceSheet(buffer);
 
-      const minimalEmployees = Array.from(new Set(result.records.map(r => r.employeeId))).map(id => ({
-        employeeId: id,
-        firstName: '',
-        lastName: id,
-        middleName: '',
-        department: '',
-        immediateSupervisor: '',
-        approver2: '',
-        hireDate: null,
-      }));
-      await upsertEmployees(minimalEmployees);
+      const uniqueIds = Array.from(new Set(result.records.map(r => r.employeeId)));
+      await insertMissingEmployees(uniqueIds);
 
       const count = await replaceAttendancePeriod(
         result.periodStart,
