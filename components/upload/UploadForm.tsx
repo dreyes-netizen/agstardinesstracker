@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 
 interface UploadResult {
   success: boolean;
-  attendanceSummary?: { period: string; employees: number; records: number };
+  attendanceSummary?: { period: string; employees: number; records: number; skipped?: number };
   rosterSummary?: { employees: number; removed: number };
   error?: string;
 }
@@ -127,6 +127,8 @@ export function UploadForm() {
                 <p>
                   Attendance: {result.attendanceSummary.records} records imported for{' '}
                   {result.attendanceSummary.employees} employees ({result.attendanceSummary.period})
+                  {result.attendanceSummary.skipped != null && result.attendanceSummary.skipped > 0 &&
+                    ` — ${result.attendanceSummary.skipped} records skipped (not in roster)`}
                 </p>
               )}
             </div>

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseAttendanceSheet } from '@/lib/parsers/attendance';
 import { parseRosterSheet } from '@/lib/parsers/roster';
-import { replaceRoster, insertMissingEmployees } from '@/lib/queries/employees';
+import { replaceRoster, getRosterEmployeeIds } from '@/lib/queries/employees';
 import { replaceAttendancePeriod, recordUpload } from '@/lib/queries/attendance';
 import { syncNteForMonth } from '@/lib/queries/nte';
 
@@ -36,23 +36,25 @@ export async function POST(req: NextRequest) {
       const buffer = Buffer.from(await attendanceFile.arrayBuffer());
       const result = parseAttendanceSheet(buffer);
 
-      const uniqueIds = Array.from(new Set(result.records.map(r => r.employeeId)));
-      await insertMissingEmployees(uniqueIds);
+      const rosterIds = await getRosterEmployeeIds();
+      const filteredRecords = result.records.filter(r => rosterIds.has(r.employeeId));
 
       const count = await replaceAttendancePeriod(
         result.periodStart,
         result.periodEnd,
-        result.records,
+        filteredRecords,
       );
       await recordUpload(attendanceFile.name, result.periodStart, result.periodEnd, count);
 
       const months = getMonthsInRange(result.periodStart, result.periodEnd);
       await Promise.all(months.map((m) => syncNteForMonth(m)));
 
+      const skipped = result.records.length - filteredRecords.length;
       attendanceSummary = {
         period: `${result.periodStart} to ${result.periodEnd}`,
-        employees: result.employeeCount,
+        employees: new Set(filteredRecords.map(r => r.employeeId)).size,
         records: count,
+        ...(skipped > 0 && { skipped }),
       };
     }
 

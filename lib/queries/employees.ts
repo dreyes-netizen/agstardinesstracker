@@ -40,6 +40,11 @@ export async function getFilterOptions() {
   return { departments, supervisors, managers, combinations };
 }
 
+export async function getRosterEmployeeIds(): Promise<Set<string>> {
+  const rows = await db.select({ employeeId: employees.employeeId }).from(employees);
+  return new Set(rows.map((r) => r.employeeId));
+}
+
 export async function insertMissingEmployees(employeeIds: string[]) {
   if (employeeIds.length === 0) return;
   for (const id of employeeIds) {
