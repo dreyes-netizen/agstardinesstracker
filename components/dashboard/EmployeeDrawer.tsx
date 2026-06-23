@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { EmployeeMonthlyStats } from '@/lib/queries/attendance';
 import { NteForm } from './NteForm';
@@ -28,17 +28,24 @@ function getDay(dateStr: string) {
 export function EmployeeDrawer({ employee, year, month, onClose, onNteAction }: EmployeeDrawerProps) {
   const [lateRecords, setLateRecords] = useState<LateRecord[]>([]);
   const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
   const monthStr = `${year}-${String(month).padStart(2, '0')}`;
 
   useEffect(() => {
-    if (!employee) { setLateRecords([]); return; }
+    if (!employee) { setLateRecords([]); setFetchError(false); return; }
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     setLoading(true);
-    fetch(`/api/employee/${employee.employeeId}/lates?year=${year}&month=${month}`)
+    setFetchError(false);
+    fetch(`/api/employee/${employee.employeeId}/lates?year=${year}&month=${month}`, { signal: controller.signal })
       .then((r) => r.json())
       .then((data: LateRecord[]) => setLateRecords(data))
-      .catch(() => setLateRecords([]))
+      .catch((err) => { if (err.name !== 'AbortError') setFetchError(true); })
       .finally(() => setLoading(false));
-  }, [employee, year, month]);
+    return () => controller.abort();
+  }, [employee?.employeeId, year, month]);
 
   if (!employee) return null;
 
@@ -91,6 +98,8 @@ export function EmployeeDrawer({ employee, year, month, onClose, onNteAction }: 
                   </div>
                 ))}
               </div>
+            ) : fetchError ? (
+              <p className="text-[12.5px] text-nte-red">Failed to load records. Please close and reopen.</p>
             ) : lateRecords.length === 0 ? (
               <p className="text-[12.5px] text-muted">No late records for this month.</p>
             ) : (

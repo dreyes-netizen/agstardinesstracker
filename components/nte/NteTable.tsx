@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, Fragment } from 'react';
+import { useRouter } from 'next/navigation';
 import { StatusBadge } from '@/components/dashboard/StatusBadge';
 import { EmployeeDrawer } from '@/components/dashboard/EmployeeDrawer';
 import { issueNteAction, acknowledgeNteAction } from '@/app/nte/actions';
@@ -55,10 +56,12 @@ function rowToStats(row: NteRow): EmployeeMonthlyStats {
 }
 
 export function NteTable({ rows }: { rows: NteRow[] }) {
+  const router = useRouter();
   const [issueForm, setIssueForm] = useState<{ employeeId: string; month: string } | null>(null);
   const [issuedBy, setIssuedBy] = useState('');
   const [notes, setNotes] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [issueLoading, setIssueLoading] = useState(false);
+  const [ackLoadingId, setAckLoadingId] = useState<string | null>(null);
   const [selected, setSelected] = useState<NteRow | null>(null);
   const [search, setSearch] = useState('');
 
@@ -75,18 +78,21 @@ export function NteTable({ rows }: { rows: NteRow[] }) {
   async function handleIssue(e: React.FormEvent) {
     e.preventDefault();
     if (!issueForm) return;
-    setLoading(true);
+    setIssueLoading(true);
     await issueNteAction(issueForm.employeeId, issueForm.month, issuedBy, notes);
     setIssueForm(null);
     setIssuedBy('');
     setNotes('');
-    setLoading(false);
+    setIssueLoading(false);
+    router.refresh();
   }
 
   async function handleAcknowledge(employeeId: string, month: string) {
-    setLoading(true);
+    const id = `${employeeId}-${month}`;
+    setAckLoadingId(id);
     await acknowledgeNteAction(employeeId, month);
-    setLoading(false);
+    setAckLoadingId(null);
+    router.refresh();
   }
 
   const drawerMonth = selected ? selected.month.split('-').map(Number) : [0, 0];
@@ -157,8 +163,8 @@ export function NteTable({ rows }: { rows: NteRow[] }) {
                           {row.issued_by && <> by <span className="font-medium text-app-text">{row.issued_by}</span></>}
                         </div>
                         {row.notes && <div className="text-[11px] text-muted italic">&ldquo;{row.notes}&rdquo;</div>}
-                        <Button size="sm" variant="outline" disabled={loading} className="text-[11px] border-safe-green/30 text-safe-green hover:bg-safe-green/5 h-7 px-3" onClick={() => handleAcknowledge(row.employee_id, row.month)}>
-                          Mark Acknowledged
+                        <Button size="sm" variant="outline" disabled={ackLoadingId === `${row.employee_id}-${row.month}`} className="text-[11px] border-safe-green/30 text-safe-green hover:bg-safe-green/5 h-7 px-3" onClick={() => handleAcknowledge(row.employee_id, row.month)}>
+                          {ackLoadingId === `${row.employee_id}-${row.month}` ? 'Saving…' : 'Mark Acknowledged'}
                         </Button>
                       </div>
                     )}
@@ -187,8 +193,8 @@ export function NteTable({ rows }: { rows: NteRow[] }) {
                           <span className="text-[12px] text-muted">Notes:</span>
                           <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional" className="h-7 text-[12.5px] bg-white w-52" />
                         </div>
-                        <Button type="submit" disabled={loading} size="sm" className="bg-nte-red hover:bg-nte-red/90 text-white h-7 text-[11px] px-3">
-                          {loading ? 'Saving…' : 'Confirm'}
+                        <Button type="submit" disabled={issueLoading} size="sm" className="bg-nte-red hover:bg-nte-red/90 text-white h-7 text-[11px] px-3">
+                          {issueLoading ? 'Saving…' : 'Confirm'}
                         </Button>
                         <Button type="button" variant="ghost" size="sm" className="h-7 text-[11px]" onClick={() => setIssueForm(null)}>Cancel</Button>
                       </form>

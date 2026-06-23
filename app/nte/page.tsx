@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import { NteTable } from '@/components/nte/NteTable';
 import { NteFilterBar } from '@/components/nte/NteFilterBar';
-import { getNteList, getNteFilterOptions, getNteCounts, syncAllNteRequired } from '@/lib/queries/nte';
+import { getNteList, getNteFilterOptions, getNteCounts } from '@/lib/queries/nte';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,12 +15,7 @@ interface PageProps {
 }
 
 export default async function NtePage({ searchParams }: PageProps) {
-  // syncAllNteRequired writes to nte_records; getNteFilterOptions reads attendance_records
-  // and employees — no overlap, safe to run in parallel.
-  const [, filterOptions] = await Promise.all([
-    syncAllNteRequired(),
-    getNteFilterOptions(),
-  ]);
+  const filterOptions = await getNteFilterOptions();
 
   // Derive defaults from the latest entry (already sorted DESC).
   const [defaultYear, defaultMonthNum] = (filterOptions.months[0] || '').split('-');

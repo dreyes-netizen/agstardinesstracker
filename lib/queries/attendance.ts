@@ -30,6 +30,10 @@ export interface DashboardFilters {
 
 export async function getMonthlyStats(filters: DashboardFilters): Promise<EmployeeMonthlyStats[]> {
   const monthStr = `${filters.year}-${String(filters.month).padStart(2, '0')}`;
+  const monthStart = `${monthStr}-01`;
+  const nextY = filters.month === 12 ? filters.year + 1 : filters.year;
+  const nextM = filters.month === 12 ? 1 : filters.month + 1;
+  const periodEnd = `${nextY}-${String(nextM).padStart(2, '0')}-01`;
 
   const rows = await db.execute(sql`
     SELECT
@@ -50,8 +54,8 @@ export async function getMonthlyStats(filters: DashboardFilters): Promise<Employ
     FROM employees e
     LEFT JOIN attendance_records a
       ON e.employee_id = a.employee_id
-      AND EXTRACT(YEAR FROM a.date::date) = ${filters.year}
-      AND EXTRACT(MONTH FROM a.date::date) = ${filters.month}
+      AND a.date >= ${monthStart}::date
+      AND a.date < ${periodEnd}::date
     LEFT JOIN nte_records n
       ON e.employee_id = n.employee_id
       AND n.month = ${monthStr}
@@ -102,6 +106,11 @@ export interface DayOfWeekStat {
 
 export async function getLateByDayOfWeek(filters: DashboardFilters): Promise<DayOfWeekStat[]> {
   const needsJoin = !!(filters.department || filters.immediateSupervisor || filters.approver2);
+  const monthStr = `${filters.year}-${String(filters.month).padStart(2, '0')}`;
+  const monthStart = `${monthStr}-01`;
+  const nextY = filters.month === 12 ? filters.year + 1 : filters.year;
+  const nextM = filters.month === 12 ? 1 : filters.month + 1;
+  const periodEnd = `${nextY}-${String(nextM).padStart(2, '0')}-01`;
 
   const rows = await db.execute(sql`
     SELECT
@@ -111,8 +120,8 @@ export async function getLateByDayOfWeek(filters: DashboardFilters): Promise<Day
     ${needsJoin ? sql`
       JOIN employees e ON a.employee_id = e.employee_id` : sql``}
     WHERE a.late_minutes > 0
-      AND EXTRACT(YEAR  FROM a.date::date) = ${filters.year}
-      AND EXTRACT(MONTH FROM a.date::date) = ${filters.month}
+      AND a.date >= ${monthStart}::date
+      AND a.date < ${periodEnd}::date
       ${needsJoin ? sql`
       AND (${filters.department          ?? null}::text IS NULL OR e.department           = ${filters.department          ?? null}::text)
       AND (${filters.immediateSupervisor ?? null}::text IS NULL OR e.immediate_supervisor = ${filters.immediateSupervisor ?? null}::text)
@@ -146,25 +155,35 @@ export async function getLatestAttendancePeriod(): Promise<{ year: number; month
 }
 
 export async function hasAttendanceData(year: number, month: number): Promise<boolean> {
+  const monthStr = `${year}-${String(month).padStart(2, '0')}`;
+  const monthStart = `${monthStr}-01`;
+  const nextY = month === 12 ? year + 1 : year;
+  const nextM = month === 12 ? 1 : month + 1;
+  const periodEnd = `${nextY}-${String(nextM).padStart(2, '0')}-01`;
   const result = await db.execute(sql`
     SELECT EXISTS (
       SELECT 1 FROM attendance_records
-      WHERE EXTRACT(YEAR FROM date::date) = ${year}
-        AND EXTRACT(MONTH FROM date::date) = ${month}
+      WHERE date >= ${monthStart}::date
+        AND date < ${periodEnd}::date
     ) AS has_data
   `);
   return (result.rows[0] as Record<string, unknown>).has_data === true;
 }
 
 export async function getEmployeeLateRecords(employeeId: string, year: number, month: number) {
+  const monthStr = `${year}-${String(month).padStart(2, '0')}`;
+  const monthStart = `${monthStr}-01`;
+  const nextY = month === 12 ? year + 1 : year;
+  const nextM = month === 12 ? 1 : month + 1;
+  const periodEnd = `${nextY}-${String(nextM).padStart(2, '0')}-01`;
   return db
     .select()
     .from(attendanceRecords)
     .where(
       and(
         eq(attendanceRecords.employeeId, employeeId),
-        sql`EXTRACT(YEAR FROM ${attendanceRecords.date}::date) = ${year}`,
-        sql`EXTRACT(MONTH FROM ${attendanceRecords.date}::date) = ${month}`,
+        sql`${attendanceRecords.date} >= ${monthStart}::date`,
+        sql`${attendanceRecords.date} < ${periodEnd}::date`,
         sql`${attendanceRecords.lateMinutes} > 0`,
       ),
     )

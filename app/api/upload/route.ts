@@ -26,10 +26,23 @@ export async function POST(req: NextRequest) {
     let rosterSummary: { employees: number; removed: number } | undefined;
 
     if (rosterFile && rosterFile.size > 0) {
+      if (rosterFile.size > 10 * 1024 * 1024) {
+        return NextResponse.json({ success: false, error: 'Roster file exceeds the 10 MB limit.' }, { status: 400 });
+      }
       const buffer = Buffer.from(await rosterFile.arrayBuffer());
       const parsed = parseRosterSheet(buffer);
+      if (parsed.length < 5) {
+        return NextResponse.json(
+          { success: false, error: `Roster upload rejected — only ${parsed.length} employee(s) detected. Upload the full Employee List Report to avoid accidental data loss.` },
+          { status: 400 },
+        );
+      }
       const { upserted, removed } = await replaceRoster(parsed);
       rosterSummary = { employees: upserted, removed };
+    }
+
+    if (attendanceFile && attendanceFile.size > 0 && attendanceFile.size > 10 * 1024 * 1024) {
+      return NextResponse.json({ success: false, error: 'Attendance file exceeds the 10 MB limit.' }, { status: 400 });
     }
 
     if (attendanceFile && attendanceFile.size > 0) {
@@ -62,7 +75,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error('Upload error:', err);
     return NextResponse.json(
-      { success: false, error: err instanceof Error ? err.message : 'Upload failed' },
+      { success: false, error: 'Upload failed. Please check your files and try again.' },
       { status: 500 },
     );
   }
