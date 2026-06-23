@@ -1,5 +1,12 @@
 import * as XLSX from 'xlsx';
 
+export class UploadValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'UploadValidationError';
+  }
+}
+
 export interface ParsedEmployee {
   employeeId: string;
   lastName: string;
@@ -54,11 +61,11 @@ function detectHeaders(row: unknown[]): Record<string, number> {
 
 export function parseRosterSheet(buffer: Buffer): ParsedEmployee[] {
   const wb = XLSX.read(buffer, { type: 'buffer', cellDates: true });
-  const sheetName =
-    wb.SheetNames.find((n) => n.toLowerCase().includes('employee')) ??
-    wb.SheetNames[0];
+  const sheetName = wb.SheetNames.find((n) => /employee list report/i.test(n));
+  if (!sheetName) throw new UploadValidationError(
+    'Wrong file — expected a sheet named "Employee List Report". Did you accidentally upload the attendance report?'
+  );
   const sheet = wb.Sheets[sheetName];
-  if (!sheet) throw new Error('No employee sheet found in roster file');
 
   const rows: unknown[][] = XLSX.utils.sheet_to_json(sheet, {
     header: 1,
@@ -78,20 +85,9 @@ export function parseRosterSheet(buffer: Buffer): ParsedEmployee[] {
     }
   }
 
-  // Fall back to fixed column positions if header detection fails
-  if (headerRowIndex === -1) {
-    colMap = {
-      employeeId: 0,
-      lastName: 1,
-      middleName: 2,
-      firstName: 3,
-      department: 4,
-      immediateSupervisor: 5,
-      approver2: 6,
-      hireDate: 10,
-    };
-    headerRowIndex = 0;
-  }
+  if (headerRowIndex === -1) throw new UploadValidationError(
+    'Could not find required column headers (Employee ID, Last Name, First Name…). Make sure you uploaded the Employee List Report.'
+  );
 
   const employees: ParsedEmployee[] = [];
 
@@ -103,7 +99,7 @@ export function parseRosterSheet(buffer: Buffer): ParsedEmployee[] {
         : '';
 
     const employeeId = get('employeeId');
-    if (!employeeId) continue;
+    if (!employeeId || !/^\d+$/.test(employeeId)) continue;
 
     employees.push({
       employeeId,
@@ -117,6 +113,13 @@ export function parseRosterSheet(buffer: Buffer): ParsedEmployee[] {
         colMap['hireDate'] !== undefined ? row[colMap['hireDate']] : null,
       ),
     });
+  }
+
+  const named = employees.filter((e) => e.firstName && e.lastName).length;
+  if (employees.length > 0 && named / employees.length < 0.8) {
+    throw new UploadValidationError(
+      'Most rows are missing employee names — this does not look like the Employee List Report.'
+    );
   }
 
   return employees;

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { parseAttendanceSheet } from '@/lib/parsers/attendance';
-import { parseRosterSheet } from '@/lib/parsers/roster';
+import { parseRosterSheet, UploadValidationError } from '@/lib/parsers/roster';
 import { replaceRoster, getRosterEmployeeIds } from '@/lib/queries/employees';
 import { replaceAttendancePeriod, recordUpload } from '@/lib/queries/attendance';
 import { syncNteForMonth } from '@/lib/queries/nte';
@@ -74,9 +74,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, attendanceSummary, rosterSummary });
   } catch (err) {
     console.error('Upload error:', err);
+    const message = err instanceof UploadValidationError
+      ? err.message
+      : 'Upload failed. Please check your files and try again.';
     return NextResponse.json(
-      { success: false, error: 'Upload failed. Please check your files and try again.' },
-      { status: 500 },
+      { success: false, error: message },
+      { status: err instanceof UploadValidationError ? 400 : 500 },
     );
   }
 }
