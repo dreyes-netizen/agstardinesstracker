@@ -78,4 +78,40 @@ describe('parseAttendanceSheet', () => {
       expect(r.reportPeriodEnd).toBe('2026-06-15');
     }
   });
+
+  it('captures Total Hours Worked (col 7)', () => {
+    const result = parseAttendanceSheet(buildTestBuffer());
+    const records = result.records.filter((r) => r.employeeId === '25358');
+    expect(records[0].totalHoursWorked).toBeCloseTo(7.85);
+    expect(records[1].totalHoursWorked).toBeCloseTo(9);
+  });
+});
+
+describe('parseAttendanceSheet — present vs absent', () => {
+  function buildBuffer(): Buffer {
+    const data: (string | number | Date | null)[][] = [
+      ['Date:', '2026-04-20 - 2026-04-26'],
+      ['ID Number:', '23209'],
+      ['Date', 'Day', 'Shift Type', 'Shift', 'Biologs', 'Late', 'Undertime', 'Hrs', 'Total'],
+      // present day (hours > 0)
+      [new Date('2026-04-20'), 'Mon', 'Sched', '09:00 PM To 06:00 AM', '08:51 PM TO 06:02 AM', 0, 0, 8, 9.18],
+      // absent day (scheduled but NO LOGS, 0 hours) — kept, hours 0
+      [new Date('2026-04-21'), 'Tue', 'Sched', '09:00 PM To 06:00 AM', 'NO LOGS', 0, 0, 0, 0],
+      // rest day — skipped
+      [null, 'Sat', 'Sched', 'REST DAY', 'NO LOGS', 0, 0, 0, 0],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Detailed');
+    return Buffer.from(XLSX.write(wb, { type: 'array', bookType: 'xlsx' }));
+  }
+
+  it('keeps absent days with 0 hours and skips rest days', () => {
+    const result = parseAttendanceSheet(buildBuffer());
+    expect(result.records).toHaveLength(2); // present + absent, rest day skipped
+    const present = result.records.find((r) => r.date === '2026-04-20')!;
+    const absent = result.records.find((r) => r.date === '2026-04-21')!;
+    expect(present.totalHoursWorked).toBeGreaterThan(0);
+    expect(absent.totalHoursWorked).toBe(0);
+  });
 });

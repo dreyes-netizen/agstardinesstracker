@@ -1,5 +1,5 @@
 import { db } from '@/lib/db';
-import { employees, attendanceRecords, nteRecords } from '@/lib/db/schema';
+import { employees, attendanceRecords, nteRecords, leaveRecords } from '@/lib/db/schema';
 import { asc, notInArray, sql } from 'drizzle-orm';
 
 export async function getLastRosterUpdate(): Promise<string | null> {
@@ -134,6 +134,7 @@ export async function replaceRoster(
     const removeIds = toRemove.map((r) => r.employeeId);
     await db.delete(attendanceRecords).where(notInArray(attendanceRecords.employeeId, keepIds));
     await db.delete(nteRecords).where(notInArray(nteRecords.employeeId, keepIds));
+    await db.delete(leaveRecords).where(notInArray(leaveRecords.employeeId, keepIds));
     await db.delete(employees).where(notInArray(employees.employeeId, keepIds));
     return { upserted: parsed.length, removed: removeIds.length };
   }

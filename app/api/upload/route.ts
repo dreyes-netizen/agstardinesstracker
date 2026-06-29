@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { timingSafeEqual } from 'crypto';
 import { parseAttendanceSheet } from '@/lib/parsers/attendance';
 import { parseRosterSheet, UploadValidationError } from '@/lib/parsers/roster';
+import { parseLeaveSheet } from '@/lib/parsers/leave';
 import { replaceRoster, getRosterEmployeeIds } from '@/lib/queries/employees';
 import { replaceAttendancePeriod, recordUpload } from '@/lib/queries/attendance';
+import { replaceLeaveFromReport } from '@/lib/queries/leave';
 import { syncNteForMonth } from '@/lib/queries/nte';
 
 function getMonthsInRange(start: string, end: string): string[] {
@@ -16,14 +19,43 @@ function getMonthsInRange(start: string, end: string): string[] {
   return Array.from(months);
 }
 
+// Constant-time password check. Returns false on length mismatch without
+// comparing (timingSafeEqual throws on unequal-length buffers).
+function passwordMatches(submitted: string, expected: string): boolean {
+  const a = Buffer.from(submitted, 'utf8');
+  const b = Buffer.from(expected, 'utf8');
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
+
+    // Gate the entire upload behind the server-side password before any
+    // parsing or DB writes. The secret lives in UPLOAD_PASSWORD (Vercel env).
+    const expectedPassword = process.env.UPLOAD_PASSWORD;
+    if (!expectedPassword) {
+      return NextResponse.json(
+        { success: false, error: 'Upload password is not configured on the server.' },
+        { status: 500 },
+      );
+    }
+    const submittedPassword = (formData.get('password') as string | null) ?? '';
+    if (!passwordMatches(submittedPassword, expectedPassword)) {
+      return NextResponse.json(
+        { success: false, error: 'Incorrect password.' },
+        { status: 401 },
+      );
+    }
+
     const attendanceFile = formData.get('attendance') as File | null;
     const rosterFile = formData.get('roster') as File | null;
+    const leaveFile = formData.get('leave') as File | null;
 
     let attendanceSummary: { period: string; employees: number; records: number } | undefined;
     let rosterSummary: { employees: number; removed: number } | undefined;
+    let leaveSummary: { period: string; records: number } | undefined;
 
     if (rosterFile && rosterFile.size > 0) {
       if (rosterFile.size > 10 * 1024 * 1024) {
@@ -71,7 +103,22 @@ export async function POST(req: NextRequest) {
       };
     }
 
-    return NextResponse.json({ success: true, attendanceSummary, rosterSummary });
+    if (leaveFile && leaveFile.size > 0) {
+      if (leaveFile.size > 10 * 1024 * 1024) {
+        return NextResponse.json({ success: false, error: 'Leave report file exceeds the 10 MB limit.' }, { status: 400 });
+      }
+      const buffer = Buffer.from(await leaveFile.arrayBuffer());
+      const parsed = parseLeaveSheet(buffer);
+      const count = await replaceLeaveFromReport(parsed.records, parsed.periodStart, parsed.periodEnd);
+      leaveSummary = {
+        period: parsed.periodStart && parsed.periodEnd
+          ? `${parsed.periodStart} to ${parsed.periodEnd}`
+          : 'detected dates',
+        records: count,
+      };
+    }
+
+    return NextResponse.json({ success: true, attendanceSummary, rosterSummary, leaveSummary });
   } catch (err) {
     console.error('Upload error:', err);
     const message = err instanceof UploadValidationError

@@ -198,6 +198,7 @@ export async function replaceAttendancePeriod(
     date: string;
     lateMinutes: number;
     undertimeMinutes: number;
+    totalHoursWorked: number;
     shiftType: string;
     shiftSchedule: string;
     actualLogs: string;
@@ -219,6 +220,7 @@ export async function replaceAttendancePeriod(
       date: r.date,
       lateMinutes: r.lateMinutes,
       undertimeMinutes: r.undertimeMinutes,
+      totalHoursWorked: String(r.totalHoursWorked ?? 0),
       shiftType: r.shiftType || null,
       shiftSchedule: r.shiftSchedule || null,
       actualLogs: r.actualLogs ? r.actualLogs.slice(0, 500) : null,

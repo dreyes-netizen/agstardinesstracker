@@ -8,6 +8,7 @@ interface UploadResult {
   success: boolean;
   attendanceSummary?: { period: string; employees: number; records: number; skipped?: number };
   rosterSummary?: { employees: number; removed: number };
+  leaveSummary?: { period: string; records: number };
   error?: string;
 }
 
@@ -15,6 +16,7 @@ export function UploadForm() {
   const [result, setResult] = useState<UploadResult | null>(null);
   const [loading, setLoading] = useState(false);
   const resultRef = useRef<HTMLDivElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -22,9 +24,20 @@ export function UploadForm() {
     const formData = new FormData(e.currentTarget);
     const attendance = formData.get('attendance') as File | null;
     const roster = formData.get('roster') as File | null;
+    const leave = formData.get('leave') as File | null;
+    const password = (formData.get('password') as string | null) ?? '';
 
-    if ((!attendance || attendance.size === 0) && (!roster || roster.size === 0)) {
+    if (
+      (!attendance || attendance.size === 0) &&
+      (!roster || roster.size === 0) &&
+      (!leave || leave.size === 0)
+    ) {
       setResult({ success: false, error: 'Please select at least one file before uploading.' });
+      return;
+    }
+
+    if (!password.trim()) {
+      setResult({ success: false, error: 'Enter the upload password.' });
       return;
     }
 
@@ -35,6 +48,7 @@ export function UploadForm() {
       const res = await fetch('/api/upload', { method: 'POST', body: formData });
       const data: UploadResult = await res.json();
       setResult(data);
+      if (data.success && passwordRef.current) passwordRef.current.value = '';
     } catch {
       setResult({ success: false, error: 'Network error — please try again.' });
     } finally {
@@ -97,6 +111,40 @@ export function UploadForm() {
         </p>
       </div>
 
+      <div className="space-y-2">
+        <Label htmlFor="leave" className="text-[12px] font-semibold uppercase tracking-[0.06em] text-muted">
+          Leave Report (.xlsx)
+        </Label>
+        <input
+          id="leave"
+          name="leave"
+          type="file"
+          accept=".xls,.xlsx"
+          className="block w-full text-[13px] text-app-text file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-[12px] file:font-semibold file:bg-navy file:text-white hover:file:bg-navy/90 cursor-pointer"
+        />
+        <p className="text-[11.5px] text-muted">
+          Feeds the Attendance Score (approved sick leave) and the Leave Report view. File from Sprout: <span className="font-medium text-app-text">Leave Report</span> (LEAVE TRANSACTIONS REPORT sheet). Re-uploading overlapping weeks is safe — duplicates are merged.
+        </p>
+      </div>
+
+      <div className="space-y-2 max-w-xs">
+        <Label htmlFor="password" className="text-[12px] font-semibold uppercase tracking-[0.06em] text-muted">
+          Upload Password
+        </Label>
+        <input
+          ref={passwordRef}
+          id="password"
+          name="password"
+          type="password"
+          autoComplete="off"
+          placeholder="Required to upload"
+          className="block w-full text-[13px] text-app-text bg-ground border border-border rounded-[5px] px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-app-blue/40 placeholder:text-muted"
+        />
+        <p className="text-[11.5px] text-muted">
+          Required before any file is imported. Verified on the server — set via the <span className="font-mono text-app-text">UPLOAD_PASSWORD</span> environment variable.
+        </p>
+      </div>
+
       <Button
         type="submit"
         disabled={loading}
@@ -129,6 +177,11 @@ export function UploadForm() {
                   {result.attendanceSummary.employees} employees ({result.attendanceSummary.period})
                   {result.attendanceSummary.skipped != null && result.attendanceSummary.skipped > 0 &&
                     ` — ${result.attendanceSummary.skipped} records skipped (not in roster)`}
+                </p>
+              )}
+              {result.leaveSummary && (
+                <p>
+                  Leave: {result.leaveSummary.records} transactions imported ({result.leaveSummary.period})
                 </p>
               )}
             </div>

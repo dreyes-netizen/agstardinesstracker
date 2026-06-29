@@ -1,10 +1,12 @@
 import * as XLSX from 'xlsx';
+import { isDateLike, toISODate, parsePeriod } from './dates';
 
 export interface ParsedAttendanceRecord {
   employeeId: string;
   date: string;           // YYYY-MM-DD
   lateMinutes: number;
   undertimeMinutes: number;
+  totalHoursWorked: number;
   shiftType: string;
   shiftSchedule: string;
   actualLogs: string;
@@ -17,37 +19,6 @@ export interface AttendanceParseResult {
   periodEnd: string;
   records: ParsedAttendanceRecord[];
   employeeCount: number;
-}
-
-function isDateLike(val: unknown): boolean {
-  if (val instanceof Date) return !isNaN(val.getTime());
-  if (typeof val === 'number') return val > 40000 && val < 60000;
-  if (typeof val === 'string') {
-    return /^\d{4}-\d{2}-\d{2}$/.test(val) || /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(val);
-  }
-  return false;
-}
-
-function toISODate(val: Date | number | string): string {
-  if (typeof val === 'string') {
-    if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
-    // MM/DD/YYYY
-    const p = val.split('/');
-    return `${p[2]}-${p[0].padStart(2, '0')}-${p[1].padStart(2, '0')}`;
-  }
-  let d: Date;
-  if (val instanceof Date) {
-    d = new Date(val.getTime() - val.getTimezoneOffset() * 60000);
-  } else {
-    d = new Date((val - 25569) * 86400 * 1000);
-  }
-  return d.toISOString().split('T')[0];
-}
-
-function parsePeriod(val: unknown): { start: string; end: string } | null {
-  if (typeof val !== 'string') return null;
-  const m = val.match(/(\d{4}-\d{2}-\d{2})\s*-\s*(\d{4}-\d{2}-\d{2})/);
-  return m ? { start: m[1], end: m[2] } : null;
 }
 
 export function parseAttendanceSheet(buffer: Buffer): AttendanceParseResult {
@@ -93,6 +64,7 @@ export function parseAttendanceSheet(buffer: Buffer): AttendanceParseResult {
       date: toISODate(row[0] as Date | number),
       lateMinutes: typeof row[5] === 'number' ? Math.round(row[5]) : 0,
       undertimeMinutes: typeof row[6] === 'number' ? Math.round(row[6]) : 0,
+      totalHoursWorked: typeof row[7] === 'number' ? row[7] : 0,
       shiftType: row[2] != null ? String(row[2]) : '',
       shiftSchedule,
       actualLogs: row[4] != null ? String(row[4]) : '',

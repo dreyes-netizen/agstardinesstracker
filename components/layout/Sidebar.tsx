@@ -4,10 +4,21 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 const navItems = [
-  { href: '/',        label: 'Dashboard',       icon: '▦' },
-  { href: '/nte',     label: 'NTE Management',  icon: '⚑' },
-  { href: '/roster',  label: 'Roster',          icon: '☰' },
-  { href: '/upload',  label: 'Upload Report',   icon: '↑' },
+  { href: '/',                 label: 'Dashboard',        icon: '▦' },
+  { href: '/attendance-score', label: 'Attendance Score', icon: '◊' },
+  { href: '/leave-report',     label: 'Leave Report',     icon: '☷' },
+  { href: '/nte',              label: 'NTE Management',   icon: '⚑' },
+  { href: '/roster',           label: 'Roster',           icon: '☰' },
+  { href: '/upload',           label: 'Upload Report',    icon: '↑' },
+];
+
+// Attendance grade scale (matches gradeFor() in lib/queries/attendance-score.ts
+// and the color tiers in ScoreTable). Shown in the sidebar on /attendance-score.
+const KPI_GRADES = [
+  { grade: 5, range: '100% and above', dot: 'bg-safe-green' },
+  { grade: 3, range: '95% – 99%',      dot: 'bg-app-blue' },
+  { grade: 2, range: '90% – 94%',      dot: 'bg-amber' },
+  { grade: 1, range: 'Below 90%',      dot: 'bg-nte-red' },
 ];
 
 interface SidebarProps {
@@ -80,6 +91,26 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             );
           })}
         </nav>
+
+        {/* Contextual KPI guide — only on the Attendance Score page */}
+        {pathname.startsWith('/attendance-score') && (
+          <div className="px-2.5 pb-4">
+            <div className="rounded-[6px] border border-white/[0.09] bg-white/[0.04] p-3">
+              <p className="font-mono text-[9px] tracking-[0.16em] uppercase text-white/45 mb-2.5">
+                KPI Score Guide
+              </p>
+              <ul className="flex flex-col gap-2">
+                {KPI_GRADES.map(({ grade, range, dot }) => (
+                  <li key={grade} className="flex items-center gap-2.5">
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dot}`} aria-hidden="true" />
+                    <span className="font-mono text-[12px] text-white/90 w-3 text-center">{grade}</span>
+                    <span className="text-[11.5px] text-white/55">{range}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
       </aside>
     </>
   );
