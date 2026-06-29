@@ -6,6 +6,7 @@ import {
   flexRender, createColumnHelper, SortingState,
 } from '@tanstack/react-table';
 import type { ApprovedLeaveRow } from '@/lib/queries/leave';
+import { formatDate } from '@/lib/utils/date';
 
 const col = createColumnHelper<ApprovedLeaveRow>();
 
@@ -26,15 +27,15 @@ const columns = [
   }),
   col.accessor('dateFiled', {
     header: 'Date Filed',
-    cell: (info) => <span className="font-mono text-[12px] text-muted">{info.getValue() ?? '—'}</span>,
+    cell: (info) => <span className="text-[12.5px] text-muted">{formatDate(info.getValue())}</span>,
   }),
   col.accessor('dateFrom', {
     header: 'Date From',
-    cell: (info) => <span className="font-mono text-[12px]">{info.getValue()}</span>,
+    cell: (info) => <span className="text-[12.5px]">{formatDate(info.getValue())}</span>,
   }),
   col.accessor('dateTo', {
     header: 'Date To',
-    cell: (info) => <span className="font-mono text-[12px]">{info.getValue()}</span>,
+    cell: (info) => <span className="text-[12.5px]">{formatDate(info.getValue())}</span>,
   }),
 ];
 

@@ -11,7 +11,7 @@ export default async function RosterPage() {
 
   const lastUpdatedLabel = lastUpdated
     ? new Date(lastUpdated).toLocaleDateString('en-US', {
-        month: 'long', day: 'numeric', year: 'numeric',
+        month: 'short', day: '2-digit', year: 'numeric',
         hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila',
       })
     : null;

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { EmployeeMonthlyStats } from '@/lib/queries/attendance';
 import { NteStatus } from '@/lib/utils/nte-status';
+import { formatDate } from '@/lib/utils/date';
 
 interface NteRow {
   id: number;
@@ -29,12 +30,7 @@ interface NteRow {
   accumulated_minutes: number;
 }
 
-function fmtDate(raw: string | null): string {
-  if (!raw) return '—';
-  return new Date(raw + 'T00:00:00').toLocaleDateString('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric',
-  });
-}
+const fmtDate = formatDate;
 
 function rowToStats(row: NteRow): EmployeeMonthlyStats {
   return {

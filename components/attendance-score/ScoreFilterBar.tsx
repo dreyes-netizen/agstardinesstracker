@@ -2,6 +2,7 @@
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useCallback, useMemo } from 'react';
+import { formatDate } from '@/lib/utils/date';
 
 interface Combination {
   department: string | null;
@@ -30,12 +31,6 @@ const PRESET_CLS =
 
 function iso(d: Date): string {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().split('T')[0];
-}
-
-function fmt(v: string): string {
-  return /^\d{4}-\d{2}-\d{2}$/.test(v)
-    ? new Date(v + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    : '—';
 }
 
 export function ScoreFilterBar({
@@ -109,7 +104,7 @@ export function ScoreFilterBar({
         Attendance Score
       </h1>
       <span className="text-[11.5px] text-muted">
-        {fmt(start)} <span className="opacity-60">→</span> {fmt(end)}
+        {formatDate(start)} <span className="opacity-60">→</span> {formatDate(end)}
       </span>
 
       <div className="flex items-center gap-2 ml-auto">

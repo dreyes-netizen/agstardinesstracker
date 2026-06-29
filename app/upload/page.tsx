@@ -3,20 +3,13 @@ import { ApiDocs } from '@/components/upload/ApiDocs';
 import { getRosterStatus } from '@/lib/queries/employees';
 import { getLeaveStatus } from '@/lib/queries/leave';
 import { getAttendanceCoverage } from '@/lib/queries/attendance';
+import { formatDate } from '@/lib/utils/date';
 
 export const dynamic = 'force-dynamic';
 
-function fmtDate(iso: string | null): string {
-  if (!iso) return '—';
-  const d = new Date(iso.length <= 10 ? iso + 'T00:00:00' : iso);
-  return isNaN(d.getTime())
-    ? '—'
-    : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
 function fmtRange(start: string | null, end: string | null): string {
   if (!start || !end) return '—';
-  return `${fmtDate(start)} – ${fmtDate(end)}`;
+  return `${formatDate(start)} – ${formatDate(end)}`;
 }
 
 export default async function UploadPage() {
@@ -30,7 +23,7 @@ export default async function UploadPage() {
     {
       label: 'Employee Roster',
       primary: roster.count > 0 ? `${roster.count.toLocaleString()} employees` : 'No roster yet',
-      secondary: roster.count > 0 ? `Updated ${fmtDate(roster.lastUpdated)}` : 'Upload the Employee List Report',
+      secondary: roster.count > 0 ? `Updated ${formatDate(roster.lastUpdated)}` : 'Upload the Employee List Report',
       filled: roster.count > 0,
     },
     {

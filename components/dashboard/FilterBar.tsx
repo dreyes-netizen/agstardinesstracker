@@ -2,6 +2,7 @@
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useCallback, useMemo } from 'react';
+import { formatDate } from '@/lib/utils/date';
 
 interface Combination {
   department: string | null;
@@ -123,11 +124,7 @@ export function FilterBar({
 
   const monthLabel = MONTHS.find((m) => m.value === month)?.label ?? '';
 
-  const latestDateLabel = latestDate
-    ? new Date(latestDate + 'T00:00:00').toLocaleDateString('en-US', {
-        month: 'long', day: 'numeric', year: 'numeric',
-      })
-    : null;
+  const latestDateLabel = latestDate ? formatDate(latestDate) : null;
 
   return (
     <div className="bg-white border-b border-border px-6 py-3 flex items-center gap-6 flex-wrap">

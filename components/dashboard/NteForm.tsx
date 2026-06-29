@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NteStatus } from '@/lib/utils/nte-status';
+import { formatDate } from '@/lib/utils/date';
 
 interface NteFormProps {
   employeeId: string;
@@ -18,12 +19,7 @@ interface NteFormProps {
   onSuccess: () => void;
 }
 
-function fmtDate(raw: string | null): string {
-  if (!raw) return '—';
-  return new Date(raw + 'T00:00:00').toLocaleDateString('en-US', {
-    month: 'long', day: 'numeric', year: 'numeric',
-  });
-}
+const fmtDate = formatDate;
 
 export function NteForm({ employeeId, month, nteStatus, issuedDate, issuedBy, acknowledgedDate, notes, onSuccess }: NteFormProps) {
   const [issuedByInput, setIssuedByInput] = useState('');
