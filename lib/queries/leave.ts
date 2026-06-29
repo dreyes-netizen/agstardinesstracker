@@ -1,6 +1,6 @@
 import { db } from '@/lib/db';
 import { leaveRecords } from '@/lib/db/schema';
-import { and, asc, eq, gte, lte } from 'drizzle-orm';
+import { and, asc, eq, gte, lte, sql } from 'drizzle-orm';
 import { getRosterEmployeeIds } from './employees';
 import type { ParsedLeaveRecord } from '@/lib/parsers/leave';
 
@@ -97,4 +97,18 @@ export async function getApprovedLeaves(
     dateFrom: r.dateFrom,
     dateTo: r.dateTo,
   }));
+}
+
+// Leave summary for the Upload page status panel: count + full date span.
+// Uses the report period when present, falling back to the leave's own dates.
+export async function getLeaveStatus(): Promise<{ count: number; start: string | null; end: string | null }> {
+  const result = await db.execute(sql`
+    SELECT
+      COUNT(*)::int AS count,
+      MIN(COALESCE(report_period_start, date_from))::text AS start,
+      MAX(COALESCE(report_period_end, date_to))::text AS "end"
+    FROM leave_records
+  `);
+  const row = result.rows[0] as { count: number; start: string | null; end: string | null };
+  return { count: Number(row?.count) || 0, start: row?.start ?? null, end: row?.end ?? null };
 }

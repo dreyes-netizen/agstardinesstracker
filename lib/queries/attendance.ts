@@ -154,6 +154,16 @@ export async function getLatestAttendancePeriod(): Promise<{ year: number; month
   };
 }
 
+// Full date span of attendance data we hold (earliest record to latest).
+export async function getAttendanceCoverage(): Promise<{ start: string | null; end: string | null; count: number }> {
+  const result = await db.execute(sql`
+    SELECT MIN(date)::text AS start, MAX(date)::text AS "end", COUNT(*)::int AS count
+    FROM attendance_records
+  `);
+  const row = result.rows[0] as { start: string | null; end: string | null; count: number };
+  return { start: row?.start ?? null, end: row?.end ?? null, count: Number(row?.count) || 0 };
+}
+
 export async function hasAttendanceData(year: number, month: number): Promise<boolean> {
   const monthStr = `${year}-${String(month).padStart(2, '0')}`;
   const monthStart = `${monthStr}-01`;

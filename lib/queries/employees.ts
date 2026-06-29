@@ -10,6 +10,15 @@ export async function getLastRosterUpdate(): Promise<string | null> {
   return row?.last_updated ?? null;
 }
 
+// Roster summary for the Upload page status panel.
+export async function getRosterStatus(): Promise<{ count: number; lastUpdated: string | null }> {
+  const result = await db.execute(
+    sql`SELECT COUNT(*)::int AS count, MAX(updated_at)::text AS last_updated FROM employees`
+  );
+  const row = result.rows[0] as { count: number; last_updated: string | null };
+  return { count: Number(row?.count) || 0, lastUpdated: row?.last_updated ?? null };
+}
+
 export async function getAllEmployees() {
   return db.select().from(employees).orderBy(asc(employees.lastName));
 }
