@@ -12,6 +12,17 @@ const col = createColumnHelper<AttendanceScore>();
 const h2 = (n: number) => n.toFixed(2);
 const pct2 = (n: number) => `${(n * 100).toFixed(2)}%`;
 
+// Render a small hours value as a readable duration (e.g. 0.4167 -> "25m",
+// 1.5 -> "1h 30m"). Used for the Undertime column only; other columns stay
+// as decimal hours, and the CSV export keeps decimals for Excel math.
+function fmtDuration(hours: number): string {
+  const totalMin = Math.round(hours * 60);
+  if (totalMin < 60) return `${totalMin}m`;
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return m ? `${h}h ${m}m` : `${h}h`;
+}
+
 // Color tiers mirror the conditional formatting in the "Attendance Score" sheet.
 function pctClass(p: number): string {
   if (p < 0.9) return 'bg-nte-red/10 text-nte-red';
@@ -71,7 +82,7 @@ const columns = [
   }),
   col.accessor('undertime', {
     header: () => <span className={rightHead}>Undertime</span>,
-    cell: (info) => <span className={numCellCls}>{h2(info.getValue())}</span>,
+    cell: (info) => <span className={numCellCls}>{fmtDuration(info.getValue())}</span>,
   }),
   col.accessor('requiredHours', {
     header: () => <span className={rightHead}>Required Hrs</span>,

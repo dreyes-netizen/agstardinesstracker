@@ -99,6 +99,23 @@ export function Sidebar({ open, onClose }: SidebarProps) {
               <p className="font-mono text-[9px] tracking-[0.16em] uppercase text-white/45 mb-2.5">
                 KPI Score Guide
               </p>
+
+              {/* How the score is computed */}
+              <div className="text-[11px] leading-snug text-white/55 space-y-1.5 mb-3">
+                <p>
+                  <span className="text-white/85">Score %</span> = hours present ÷ required hours
+                </p>
+                <p>
+                  <span className="text-white/85">Present</span> = (present days × 8h) − undertime − sick
+                </p>
+                <p>
+                  <span className="text-white/85">Required</span> = (present + absent days) × 8h
+                </p>
+              </div>
+
+              <p className="font-mono text-[9px] tracking-[0.16em] uppercase text-white/45 mb-2">
+                Grade
+              </p>
               <ul className="flex flex-col gap-2">
                 {KPI_GRADES.map(({ grade, range, dot }) => (
                   <li key={grade} className="flex items-center gap-2.5">
