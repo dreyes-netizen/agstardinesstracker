@@ -41,11 +41,8 @@ export default async function AttendanceScorePage({ searchParams }: PageProps) {
     defaultStart = `${todayPH.slice(0, 7)}-01`;
     defaultEnd = todayPH;
   } else if (latestRange) {
-    const ym = latestRange.end.slice(0, 7); // "YYYY-MM"
-    const [y, m] = ym.split('-').map(Number);
-    const lastDay = new Date(y, m, 0).getDate();
-    defaultStart = `${ym}-01`;
-    defaultEnd = `${ym}-${String(lastDay).padStart(2, '0')}`;
+    defaultStart = `${latestRange.end.slice(0, 7)}-01`;
+    defaultEnd = latestRange.end;
   }
 
   const start = isISO(searchParams.start) ? searchParams.start : defaultStart;
