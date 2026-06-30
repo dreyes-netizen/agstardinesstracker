@@ -3,6 +3,7 @@ import { ScoreFilterBar } from '@/components/attendance-score/ScoreFilterBar';
 import { ScoreTable } from '@/components/attendance-score/ScoreTable';
 import { getFilterOptions } from '@/lib/queries/employees';
 import { getAttendanceScores, getLatestAttendanceRange } from '@/lib/queries/attendance-score';
+import { hasAttendanceData } from '@/lib/queries/attendance';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,14 +22,24 @@ function isISO(v: string | undefined): v is string {
 }
 
 export default async function AttendanceScorePage({ searchParams }: PageProps) {
-  const [latestRange, filterOptions] = await Promise.all([
+  // "Today" in Manila time (YYYY-MM-DD), to match the rest of the app.
+  const todayPH = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
+  const curYear = Number(todayPH.slice(0, 4));
+  const curMonth = Number(todayPH.slice(5, 7));
+
+  const [latestRange, filterOptions, hasThisMonth] = await Promise.all([
     getLatestAttendanceRange(),
     getFilterOptions(),
+    hasAttendanceData(curYear, curMonth),
   ]);
 
-  // Default to the most recent uploaded attendance period.
-  const start = isISO(searchParams.start) ? searchParams.start : latestRange?.start ?? '';
-  const end = isISO(searchParams.end) ? searchParams.end : latestRange?.end ?? '';
+  // Default: month-to-date (1st → today) when the current month has data,
+  // otherwise fall back to the most recent uploaded attendance period.
+  const defaultStart = hasThisMonth ? `${todayPH.slice(0, 7)}-01` : latestRange?.start ?? '';
+  const defaultEnd = hasThisMonth ? todayPH : latestRange?.end ?? '';
+
+  const start = isISO(searchParams.start) ? searchParams.start : defaultStart;
+  const end = isISO(searchParams.end) ? searchParams.end : defaultEnd;
 
   const dept = searchParams.dept;
   const supervisor = searchParams.supervisor;

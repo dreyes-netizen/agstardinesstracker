@@ -140,6 +140,7 @@ export function EmployeeTable({ data, year, month, dept, supervisor, manager }: 
       <div className="bg-white border border-border rounded-[7px] overflow-clip flex flex-col flex-1 min-h-0">
         <div className="px-5 py-3 border-b border-border flex items-center gap-3 flex-shrink-0">
           <span className="text-[13.5px] font-semibold text-app-text flex-shrink-0">Employees</span>
+          <span className="text-[11px] text-muted flex-shrink-0 hidden lg:inline">Click a row to view details</span>
           <div className="flex-1 relative">
             <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>

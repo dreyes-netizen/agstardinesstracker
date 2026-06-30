@@ -38,7 +38,6 @@ export async function replaceLeaveFromReport(
           leaveRecords.leaveType,
           leaveRecords.dateFrom,
           leaveRecords.dateTo,
-          leaveRecords.dateFiled,
         ],
         set: {
           name: r.name || null,

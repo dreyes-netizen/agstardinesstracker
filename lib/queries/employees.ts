@@ -23,6 +23,34 @@ export async function getAllEmployees() {
   return db.select().from(employees).orderBy(asc(employees.lastName));
 }
 
+// Lightweight list for the Users add-form picker (Employee ID → name).
+export async function getEmployeeOptions(): Promise<{ employeeId: string; name: string; department: string | null }[]> {
+  const rows = await db
+    .select({
+      employeeId: employees.employeeId,
+      firstName: employees.firstName,
+      lastName: employees.lastName,
+      department: employees.department,
+    })
+    .from(employees)
+    .orderBy(asc(employees.lastName));
+  return rows.map((r) => ({
+    employeeId: r.employeeId,
+    name: [r.firstName, r.lastName].filter(Boolean).join(' ').trim() || r.employeeId,
+    department: r.department,
+  }));
+}
+
+// Authoritative single-employee lookup (server derives the name from the roster).
+export async function getEmployeeById(employeeId: string) {
+  const rows = await db
+    .select()
+    .from(employees)
+    .where(sql`${employees.employeeId} = ${employeeId}`)
+    .limit(1);
+  return rows[0];
+}
+
 export async function getFilterOptions() {
   const rows = await db
     .selectDistinct({

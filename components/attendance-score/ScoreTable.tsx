@@ -6,39 +6,16 @@ import {
   flexRender, createColumnHelper, SortingState,
 } from '@tanstack/react-table';
 import type { AttendanceScore } from '@/lib/queries/attendance-score';
+import { ScoreDrawer } from './ScoreDrawer';
+import { h2, pct2, fmtDuration, pctClass, gradeClass } from '@/lib/utils/score-format';
 
 const col = createColumnHelper<AttendanceScore>();
 
-const h2 = (n: number) => n.toFixed(2);
-const pct2 = (n: number) => `${(n * 100).toFixed(2)}%`;
-
-// Render a small hours value as a readable duration (e.g. 0.4167 -> "25m",
-// 1.5 -> "1h 30m"). Used for the Undertime column only; other columns stay
-// as decimal hours, and the CSV export keeps decimals for Excel math.
-function fmtDuration(hours: number): string {
-  const totalMin = Math.round(hours * 60);
-  if (totalMin < 60) return `${totalMin}m`;
-  const h = Math.floor(totalMin / 60);
-  const m = totalMin % 60;
-  return m ? `${h}h ${m}m` : `${h}h`;
-}
-
-// Color tiers mirror the conditional formatting in the "Attendance Score" sheet.
-function pctClass(p: number): string {
-  if (p < 0.9) return 'bg-nte-red/10 text-nte-red';
-  if (p < 0.95) return 'bg-amber/10 text-amber';
-  if (p < 1) return 'bg-app-blue/10 text-app-blue';
-  return 'bg-safe-green/10 text-safe-green';
-}
-function gradeClass(g: number): string {
-  if (g === 1) return 'bg-nte-red/10 text-nte-red';
-  if (g === 2) return 'bg-amber/10 text-amber';
-  if (g === 3) return 'bg-app-blue/10 text-app-blue';
-  return 'bg-safe-green/10 text-safe-green';
-}
-
 const rightHead = 'block text-right';
 const numCellCls = 'font-mono text-[12.5px] block text-right';
+// Zero on an "exception" column (absent/sick/undertime) reads as a muted dash,
+// so the rows that actually have values stand out. CSV export keeps real numbers.
+const dash = <span className="text-muted/50">—</span>;
 
 const columns = [
   col.accessor('employeeId', {
@@ -67,7 +44,7 @@ const columns = [
   }),
   col.accessor('totalHoursAbsent', {
     header: () => <span className={rightHead}>Hrs Absent</span>,
-    cell: (info) => <span className={numCellCls}>{h2(info.getValue())}</span>,
+    cell: (info) => { const v = info.getValue(); return <span className={numCellCls}>{v > 0 ? h2(v) : dash}</span>; },
   }),
   col.accessor('totalSickLeaveHours', {
     header: () => <span className={rightHead}>Sick Hrs</span>,
@@ -75,14 +52,14 @@ const columns = [
       const v = info.getValue();
       return (
         <span className={`${numCellCls} ${v > 0 ? 'text-amber font-medium' : ''}`}>
-          {h2(v)}
+          {v > 0 ? h2(v) : dash}
         </span>
       );
     },
   }),
   col.accessor('undertime', {
     header: () => <span className={rightHead}>Undertime</span>,
-    cell: (info) => <span className={numCellCls}>{fmtDuration(info.getValue())}</span>,
+    cell: (info) => { const v = info.getValue(); return <span className={numCellCls}>{v > 0 ? fmtDuration(v) : dash}</span>; },
   }),
   col.accessor('requiredHours', {
     header: () => <span className={rightHead}>Required Hrs</span>,
@@ -102,7 +79,7 @@ const columns = [
     },
   }),
   col.accessor('attendanceGrade', {
-    header: () => <span className="block text-center">Grade</span>,
+    header: () => <span className="block text-center">Score</span>,
     cell: (info) => {
       const g = info.getValue();
       return (
@@ -133,6 +110,7 @@ function escCsv(v: string | number | null | undefined): string {
 export function ScoreTable({ data, start, end, dept, supervisor, manager }: ScoreTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [search, setSearch] = useState('');
+  const [selected, setSelected] = useState<AttendanceScore | null>(null);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -150,7 +128,7 @@ export function ScoreTable({ data, start, end, dept, supervisor, manager }: Scor
       [],
       ['ID No', 'Full Name', 'Account', 'Team Leader', 'Account Manager',
         'Total Hours Present', 'Total Hours Absent', 'Total Sick Leave Hours',
-        'Undertime', 'Required Hours', 'Attendance Percentage', 'Attendance Grade'],
+        'Undertime', 'Required Hours', 'Attendance Percentage', 'Score'],
       ...filtered.map((e) => [
         e.employeeId,
         e.fullName,
@@ -188,6 +166,7 @@ export function ScoreTable({ data, start, end, dept, supervisor, manager }: Scor
     <div className="bg-white border border-border rounded-[7px] overflow-clip flex flex-col flex-1 min-h-0">
       <div className="px-5 py-3 border-b border-border flex items-center gap-3 flex-shrink-0">
         <span className="text-[13.5px] font-semibold text-app-text flex-shrink-0">Scores</span>
+        <span className="text-[11px] text-muted flex-shrink-0 hidden lg:inline">Click a row to view details</span>
         <div className="flex-1 relative">
           <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
@@ -236,7 +215,11 @@ export function ScoreTable({ data, start, end, dept, supervisor, manager }: Scor
             {table.getRowModel().rows.map((row, i) => (
               <tr
                 key={row.id}
-                className={`border-b border-row-border transition-colors ${i % 2 === 1 ? 'bg-row-alt' : ''} hover:bg-row-hover`}
+                tabIndex={0}
+                onClick={() => setSelected(row.original)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelected(row.original); } }}
+                aria-selected={selected?.employeeId === row.original.employeeId}
+                className={`border-b border-row-border cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-blue focus-visible:ring-inset ${i % 2 === 1 ? 'bg-row-alt' : ''} ${selected?.employeeId === row.original.employeeId ? 'bg-row-active' : 'hover:bg-row-hover'}`}
               >
                 {row.getVisibleCells().map((cell) => (
                   <td key={cell.id} className="px-3.5 py-[10px] text-[13px] first:pl-5 last:pr-5">
@@ -248,6 +231,8 @@ export function ScoreTable({ data, start, end, dept, supervisor, manager }: Scor
           </tbody>
         </table>
       </div>
+
+      <ScoreDrawer score={selected} start={start} end={end} onClose={() => setSelected(null)} />
     </div>
   );
 }

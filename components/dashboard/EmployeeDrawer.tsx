@@ -45,6 +45,8 @@ export function EmployeeDrawer({ employee, year, month, onClose, onNteAction }: 
       .catch((err) => { if (err.name !== 'AbortError') setFetchError(true); })
       .finally(() => setLoading(false));
     return () => controller.abort();
+    // Keyed on employeeId (not the whole employee object) intentionally.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [employee?.employeeId, year, month]);
 
   if (!employee) return null;

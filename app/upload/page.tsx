@@ -4,6 +4,7 @@ import { getRosterStatus } from '@/lib/queries/employees';
 import { getLeaveStatus } from '@/lib/queries/leave';
 import { getAttendanceCoverage } from '@/lib/queries/attendance';
 import { formatDate } from '@/lib/utils/date';
+import { requireRole } from '@/lib/auth/session';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +14,7 @@ function fmtRange(start: string | null, end: string | null): string {
 }
 
 export default async function UploadPage() {
+  await requireRole('admin'); // managers are redirected home
   const [roster, attendance, leave] = await Promise.all([
     getRosterStatus(),
     getAttendanceCoverage(),

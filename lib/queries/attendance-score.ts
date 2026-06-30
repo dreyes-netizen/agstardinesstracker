@@ -125,6 +125,79 @@ export async function getAttendanceScores(filters: ScoreFilters): Promise<Attend
   });
 }
 
+export interface ScoreDetailDay {
+  date: string;
+  hoursWorked: number;
+  lateMinutes: number;
+  undertimeMinutes: number;
+  present: boolean;
+}
+export interface ScoreDetailSick {
+  dateFrom: string;
+  dateTo: string;
+  withPayDays: number;
+  countedDays: number;
+}
+export interface ScoreDetail {
+  daily: ScoreDetailDay[];
+  sick: ScoreDetailSick[];
+}
+
+// Per-employee breakdown behind the aggregate score, for the detail drawer.
+export async function getEmployeeScoreDetail(
+  employeeId: string,
+  start: string,
+  end: string,
+): Promise<ScoreDetail> {
+  const dailyRes = await db.execute(sql`
+    SELECT
+      date::text AS date,
+      COALESCE(total_hours_worked, 0)::float8 AS hours_worked,
+      COALESCE(late_minutes, 0)::int AS late_minutes,
+      COALESCE(undertime_minutes, 0)::int AS undertime_minutes
+    FROM attendance_records
+    WHERE employee_id = ${employeeId}
+      AND date >= ${start}::date AND date <= ${end}::date
+    ORDER BY date
+  `);
+
+  const daily: ScoreDetailDay[] = (dailyRes.rows as Record<string, unknown>[]).map((r) => {
+    const hoursWorked = Number(r.hours_worked) || 0;
+    return {
+      date: String(r.date),
+      hoursWorked,
+      lateMinutes: Number(r.late_minutes) || 0,
+      undertimeMinutes: Number(r.undertime_minutes) || 0,
+      present: hoursWorked > 0,
+    };
+  });
+
+  const sickRes = await db.execute(sql`
+    SELECT
+      date_from::text AS date_from,
+      date_to::text AS date_to,
+      with_pay_days::float8 AS with_pay_days,
+      LEAST(
+        with_pay_days,
+        GREATEST(0, (LEAST(date_to, ${end}::date) - GREATEST(date_from, ${start}::date)) + 1)
+      )::float8 AS counted_days
+    FROM leave_records
+    WHERE employee_id = ${employeeId}
+      AND status = 'Approved' AND leave_type = 'Sick'
+      AND date_from <= ${end}::date AND date_to >= ${start}::date
+    ORDER BY date_from
+  `);
+
+  const sick: ScoreDetailSick[] = (sickRes.rows as Record<string, unknown>[]).map((r) => ({
+    dateFrom: String(r.date_from),
+    dateTo: String(r.date_to),
+    withPayDays: Number(r.with_pay_days) || 0,
+    countedDays: Number(r.counted_days) || 0,
+  }));
+
+  return { daily, sick };
+}
+
 // Most recent uploaded attendance period — used as the default range.
 export async function getLatestAttendanceRange(): Promise<{ start: string; end: string } | null> {
   const result = await db.execute(sql`

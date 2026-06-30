@@ -16,7 +16,6 @@ export function UploadForm() {
   const [result, setResult] = useState<UploadResult | null>(null);
   const [loading, setLoading] = useState(false);
   const resultRef = useRef<HTMLDivElement>(null);
-  const passwordRef = useRef<HTMLInputElement>(null);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -25,7 +24,6 @@ export function UploadForm() {
     const attendance = formData.get('attendance') as File | null;
     const roster = formData.get('roster') as File | null;
     const leave = formData.get('leave') as File | null;
-    const password = (formData.get('password') as string | null) ?? '';
 
     if (
       (!attendance || attendance.size === 0) &&
@@ -36,11 +34,6 @@ export function UploadForm() {
       return;
     }
 
-    if (!password.trim()) {
-      setResult({ success: false, error: 'Enter the upload password.' });
-      return;
-    }
-
     setLoading(true);
     setResult(null);
 
@@ -48,7 +41,6 @@ export function UploadForm() {
       const res = await fetch('/api/upload', { method: 'POST', body: formData });
       const data: UploadResult = await res.json();
       setResult(data);
-      if (data.success && passwordRef.current) passwordRef.current.value = '';
     } catch {
       setResult({ success: false, error: 'Network error — please try again.' });
     } finally {
@@ -124,24 +116,6 @@ export function UploadForm() {
         />
         <p className="text-[11.5px] text-muted">
           Feeds the Attendance Score (approved sick leave) and the Leave Report view. File from Sprout: <span className="font-medium text-app-text">Leave Report</span> (LEAVE TRANSACTIONS REPORT sheet). Re-uploading overlapping weeks is safe — duplicates are merged.
-        </p>
-      </div>
-
-      <div className="space-y-2 max-w-xs">
-        <Label htmlFor="password" className="text-[12px] font-semibold uppercase tracking-[0.06em] text-muted">
-          Upload Password
-        </Label>
-        <input
-          ref={passwordRef}
-          id="password"
-          name="password"
-          type="password"
-          autoComplete="off"
-          placeholder="Required to upload"
-          className="block w-full text-[13px] text-app-text bg-ground border border-border rounded-[5px] px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-app-blue/40 placeholder:text-muted"
-        />
-        <p className="text-[11.5px] text-muted">
-          Required before any file is imported. Verified on the server — set via the <span className="font-mono text-app-text">UPLOAD_PASSWORD</span> environment variable.
         </p>
       </div>
 

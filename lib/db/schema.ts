@@ -1,6 +1,35 @@
 import {
-  pgTable, serial, text, integer, numeric, date, timestamp, uniqueIndex,
+  pgTable, serial, text, integer, numeric, date, timestamp, boolean, uniqueIndex,
 } from 'drizzle-orm/pg-core';
+
+// Allowlist + roles for app access. A row here = an account permitted to sign in.
+// role: 'admin' (everything, incl. upload + user management) | 'manager'
+// (view + issue/acknowledge NTE). Email stored lowercased.
+export const appUsers = pgTable('app_users', {
+  id: serial('id').primaryKey(),
+  email: text('email').unique().notNull(),
+  role: text('role').notNull().default('manager'),
+  displayName: text('display_name'),
+  // Soft link to employees.employee_id (no FK on purpose — a roster re-upload
+  // must not cascade-delete accounts). Name is snapshotted in display_name.
+  employeeId: text('employee_id'),
+  active: boolean('active').notNull().default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Append-only audit trail of every NTE action (who / what / when).
+export const nteAuditLog = pgTable('nte_audit_log', {
+  id: serial('id').primaryKey(),
+  nteRecordId: integer('nte_record_id'),
+  employeeId: text('employee_id').notNull(),
+  month: text('month').notNull(),
+  action: text('action').notNull(),          // 'issued' | 'acknowledged' | …
+  actorEmail: text('actor_email').notNull(),
+  actorRole: text('actor_role'),
+  details: text('details'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
 
 export const employees = pgTable('employees', {
   id: serial('id').primaryKey(),
@@ -66,9 +95,11 @@ export const leaveRecords = pgTable('leave_records', {
   reportPeriodEnd: date('report_period_end'),
   createdAt: timestamp('created_at').defaultNow(),
 }, (t) => ({
-  // Dedup the same leave appearing in overlapping weekly reports.
+  // Dedup the same leave appearing in overlapping weekly reports. Keyed on the
+  // employee + type + span only (date_filed is nullable, and NULLs defeat a
+  // unique index in Postgres — two of the same leave would slip through).
   leaveUniq: uniqueIndex('leave_uniq').on(
-    t.employeeId, t.leaveType, t.dateFrom, t.dateTo, t.dateFiled,
+    t.employeeId, t.leaveType, t.dateFrom, t.dateTo,
   ),
 }));
 
@@ -85,3 +116,6 @@ export type Employee = typeof employees.$inferSelect;
 export type AttendanceRecord = typeof attendanceRecords.$inferSelect;
 export type NteRecord = typeof nteRecords.$inferSelect;
 export type LeaveRecord = typeof leaveRecords.$inferSelect;
+export type AppUser = typeof appUsers.$inferSelect;
+export type NteAuditEntry = typeof nteAuditLog.$inferSelect;
+export type Role = 'admin' | 'manager';

@@ -1,14 +1,25 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
 import { Sidebar } from './Sidebar';
 
-export function ClientLayout({ children }: { children: ReactNode }) {
+export interface NavUser {
+  email: string;
+  role: 'admin' | 'manager';
+  displayName: string | null;
+}
+
+export function ClientLayout({ children, user }: { children: ReactNode; user: NavUser | null }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const pathname = usePathname();
+
+  // The login page has no app shell (no sidebar).
+  if (pathname === '/login') return <>{children}</>;
 
   return (
     <div className="flex h-screen overflow-hidden bg-ground">
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} user={user} />
 
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Mobile top bar — hidden on md+ */}
@@ -20,7 +31,7 @@ export function ClientLayout({ children }: { children: ReactNode }) {
           >
             ☰
           </button>
-          <span className="text-[14px] font-semibold text-app-text tracking-tight">Tardiness Tracker</span>
+          <span className="text-[14px] font-semibold text-app-text tracking-tight">Attendance Hub</span>
         </header>
 
         <main className="flex-1 overflow-y-auto">

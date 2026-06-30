@@ -54,7 +54,6 @@ function rowToStats(row: NteRow): EmployeeMonthlyStats {
 export function NteTable({ rows }: { rows: NteRow[] }) {
   const router = useRouter();
   const [issueForm, setIssueForm] = useState<{ employeeId: string; month: string } | null>(null);
-  const [issuedBy, setIssuedBy] = useState('');
   const [notes, setNotes] = useState('');
   const [issueLoading, setIssueLoading] = useState(false);
   const [ackLoadingId, setAckLoadingId] = useState<string | null>(null);
@@ -75,9 +74,8 @@ export function NteTable({ rows }: { rows: NteRow[] }) {
     e.preventDefault();
     if (!issueForm) return;
     setIssueLoading(true);
-    await issueNteAction(issueForm.employeeId, issueForm.month, issuedBy, notes);
+    await issueNteAction(issueForm.employeeId, issueForm.month, notes);
     setIssueForm(null);
-    setIssuedBy('');
     setNotes('');
     setIssueLoading(false);
     router.refresh();
@@ -181,10 +179,6 @@ export function NteTable({ rows }: { rows: NteRow[] }) {
                   <tr className="bg-[#FFF8F5] border-b border-nte-red/10">
                     <td colSpan={8} className="px-5 py-3">
                       <form onSubmit={handleIssue} className="flex items-center gap-3 flex-wrap">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[12px] text-muted">Issued by:</span>
-                          <Input value={issuedBy} onChange={(e) => setIssuedBy(e.target.value)} placeholder="Your name" required className="h-7 text-[12.5px] bg-white w-40" />
-                        </div>
                         <div className="flex items-center gap-2">
                           <span className="text-[12px] text-muted">Notes:</span>
                           <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional" className="h-7 text-[12.5px] bg-white w-52" />

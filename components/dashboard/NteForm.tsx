@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NteStatus } from '@/lib/utils/nte-status';
 import { formatDate } from '@/lib/utils/date';
+import { NteHistory } from './NteHistory';
 
 interface NteFormProps {
   employeeId: string;
@@ -22,7 +23,6 @@ interface NteFormProps {
 const fmtDate = formatDate;
 
 export function NteForm({ employeeId, month, nteStatus, issuedDate, issuedBy, acknowledgedDate, notes, onSuccess }: NteFormProps) {
-  const [issuedByInput, setIssuedByInput] = useState('');
   const [notesInput, setNotesInput] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -31,7 +31,7 @@ export function NteForm({ employeeId, month, nteStatus, issuedDate, issuedBy, ac
   async function handleIssue(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    await issueNteAction(employeeId, month, issuedByInput, notesInput);
+    await issueNteAction(employeeId, month, notesInput);
     setLoading(false);
     onSuccess();
   }
@@ -49,6 +49,7 @@ export function NteForm({ employeeId, month, nteStatus, issuedDate, issuedBy, ac
         <p>NTE issued <span className="font-medium text-app-text">{fmtDate(issuedDate)}</span> by <span className="font-medium text-app-text">{issuedBy ?? '—'}</span></p>
         {notes && <p>Notes: {notes}</p>}
         <p className="text-safe-green font-medium">Acknowledged {fmtDate(acknowledgedDate)}</p>
+        <NteHistory employeeId={employeeId} month={month} />
       </div>
     );
   }
@@ -63,6 +64,7 @@ export function NteForm({ employeeId, month, nteStatus, issuedDate, issuedBy, ac
         <Button onClick={handleAcknowledge} disabled={loading} variant="outline" className="w-full border-safe-green/40 text-safe-green hover:bg-safe-green/5">
           {loading ? 'Saving…' : 'Mark Acknowledged'}
         </Button>
+        <NteHistory employeeId={employeeId} month={month} />
       </div>
     );
   }
@@ -74,10 +76,6 @@ export function NteForm({ employeeId, month, nteStatus, issuedDate, issuedBy, ac
           Threshold crossed — NTE required for {monthLabel}
         </div>
         <form onSubmit={handleIssue} className="space-y-3">
-          <div className="space-y-1">
-            <Label className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted">Issued by</Label>
-            <Input value={issuedByInput} onChange={(e) => setIssuedByInput(e.target.value)} placeholder="Your name" required className="text-[12.5px] bg-ground" />
-          </div>
           <div className="space-y-1">
             <Label className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted">Notes</Label>
             <Input value={notesInput} onChange={(e) => setNotesInput(e.target.value)} placeholder="Optional — context or follow-up" className="text-[12.5px] bg-ground" />
