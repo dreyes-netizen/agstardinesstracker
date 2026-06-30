@@ -34,9 +34,19 @@ export default async function AttendanceScorePage({ searchParams }: PageProps) {
   ]);
 
   // Default: month-to-date (1st → today) when the current month has data,
-  // otherwise fall back to the most recent uploaded attendance period.
-  const defaultStart = hasThisMonth ? `${todayPH.slice(0, 7)}-01` : latestRange?.start ?? '';
-  const defaultEnd = hasThisMonth ? todayPH : latestRange?.end ?? '';
+  // otherwise show the whole month of the most recent uploaded period.
+  let defaultStart = '';
+  let defaultEnd = '';
+  if (hasThisMonth) {
+    defaultStart = `${todayPH.slice(0, 7)}-01`;
+    defaultEnd = todayPH;
+  } else if (latestRange) {
+    const ym = latestRange.end.slice(0, 7); // "YYYY-MM"
+    const [y, m] = ym.split('-').map(Number);
+    const lastDay = new Date(y, m, 0).getDate();
+    defaultStart = `${ym}-01`;
+    defaultEnd = `${ym}-${String(lastDay).padStart(2, '0')}`;
+  }
 
   const start = isISO(searchParams.start) ? searchParams.start : defaultStart;
   const end = isISO(searchParams.end) ? searchParams.end : defaultEnd;

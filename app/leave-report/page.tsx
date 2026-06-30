@@ -25,8 +25,18 @@ export default async function LeaveReportPage({ searchParams }: PageProps) {
     hasAttendanceData(curYear, curMonth),
   ]);
 
-  const defaultStart = hasThisMonth ? `${todayPH.slice(0, 7)}-01` : latestRange?.start ?? '';
-  const defaultEnd = hasThisMonth ? todayPH : latestRange?.end ?? '';
+  let defaultStart = '';
+  let defaultEnd = '';
+  if (hasThisMonth) {
+    defaultStart = `${todayPH.slice(0, 7)}-01`;
+    defaultEnd = todayPH;
+  } else if (latestRange) {
+    const ym = latestRange.end.slice(0, 7);
+    const [y, m] = ym.split('-').map(Number);
+    const lastDay = new Date(y, m, 0).getDate();
+    defaultStart = `${ym}-01`;
+    defaultEnd = `${ym}-${String(lastDay).padStart(2, '0')}`;
+  }
 
   const start = isISO(searchParams.start) ? searchParams.start : defaultStart;
   const end = isISO(searchParams.end) ? searchParams.end : defaultEnd;
