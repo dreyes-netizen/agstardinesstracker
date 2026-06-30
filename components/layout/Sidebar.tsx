@@ -74,7 +74,7 @@ export function Sidebar({ open, onClose, user }: SidebarProps) {
             </div>
             <div className="min-w-0">
               <p className="font-mono text-[9px] tracking-[0.16em] uppercase text-white/50 mb-0.5">
-                AGS Internal
+                Alliance Global Solutions
               </p>
               <p className="text-[14px] font-semibold text-white tracking-tight truncate">
                 Attendance Hub

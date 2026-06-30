@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { EmployeeMonthlyStats } from '@/lib/queries/attendance';
 import { NteForm } from './NteForm';
+import { formatDate } from '@/lib/utils/date';
 
 interface LateRecord {
   date: string;
@@ -116,7 +117,7 @@ export function EmployeeDrawer({ employee, year, month, onClose, onNteAction }: 
                 <tbody>
                   {lateRecords.map((r) => (
                     <tr key={r.date} className="border-b border-[#F0F2F5]">
-                      <td className="font-mono text-[12px] py-2">{r.date}</td>
+                      <td className="font-mono text-[12px] py-2 whitespace-nowrap">{formatDate(r.date)}</td>
                       <td className="text-[12px] text-muted py-2">{getDay(r.date)}</td>
                       <td className="font-mono text-[13px] font-semibold text-nte-red text-right py-2">
                         {r.lateMinutes} <span className="text-[10px] text-muted font-normal">min</span>

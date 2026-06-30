@@ -3,6 +3,7 @@ import { LeaveFilterBar } from '@/components/leave-report/LeaveFilterBar';
 import { LeaveTable } from '@/components/leave-report/LeaveTable';
 import { getApprovedLeaves } from '@/lib/queries/leave';
 import { getLatestAttendanceRange } from '@/lib/queries/attendance-score';
+import { hasAttendanceData } from '@/lib/queries/attendance';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,10 +16,20 @@ function isISO(v: string | undefined): v is string {
 }
 
 export default async function LeaveReportPage({ searchParams }: PageProps) {
-  const latestRange = await getLatestAttendanceRange();
+  const todayPH = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
+  const curYear = Number(todayPH.slice(0, 4));
+  const curMonth = Number(todayPH.slice(5, 7));
 
-  const start = isISO(searchParams.start) ? searchParams.start : latestRange?.start ?? '';
-  const end = isISO(searchParams.end) ? searchParams.end : latestRange?.end ?? '';
+  const [latestRange, hasThisMonth] = await Promise.all([
+    getLatestAttendanceRange(),
+    hasAttendanceData(curYear, curMonth),
+  ]);
+
+  const defaultStart = hasThisMonth ? `${todayPH.slice(0, 7)}-01` : latestRange?.start ?? '';
+  const defaultEnd = hasThisMonth ? todayPH : latestRange?.end ?? '';
+
+  const start = isISO(searchParams.start) ? searchParams.start : defaultStart;
+  const end = isISO(searchParams.end) ? searchParams.end : defaultEnd;
   const hasRange = isISO(start) && isISO(end);
 
   const leaves = hasRange ? await getApprovedLeaves(start, end) : [];

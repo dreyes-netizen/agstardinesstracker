@@ -10,32 +10,50 @@ import { formatDate } from '@/lib/utils/date';
 
 const col = createColumnHelper<ApprovedLeaveRow>();
 
-const dash = (v: string | null) => <span>{v ?? '—'}</span>;
-
 const columns = [
   col.accessor('employeeId', {
     header: 'Employee ID',
-    cell: (info) => <span className="font-mono text-[12px]">{info.getValue()}</span>,
+    cell: (info) => <span className="font-mono text-[12px] whitespace-nowrap">{info.getValue()}</span>,
   }),
   col.accessor('name', {
     header: 'Name',
-    cell: (info) => <span className="font-medium">{info.getValue() ?? '—'}</span>,
+    cell: (info) => (
+      <span className="font-medium block truncate" title={info.getValue() ?? undefined}>
+        {info.getValue() ?? '—'}
+      </span>
+    ),
+  }),
+  col.accessor('department', {
+    header: 'Department',
+    cell: (info) => (
+      <span className="text-muted text-[12px] block truncate" title={info.getValue() ?? undefined}>
+        {info.getValue() ?? '—'}
+      </span>
+    ),
   }),
   col.accessor('leaveType', {
     header: 'Leave Type',
-    cell: (info) => dash(info.getValue()),
+    cell: (info) => <span className="whitespace-nowrap text-[13px]">{info.getValue() ?? '—'}</span>,
   }),
   col.accessor('dateFiled', {
     header: 'Date Filed',
-    cell: (info) => <span className="text-[12.5px] text-muted">{formatDate(info.getValue())}</span>,
+    cell: (info) => <span className="text-[12.5px] text-muted whitespace-nowrap">{formatDate(info.getValue())}</span>,
   }),
   col.accessor('dateFrom', {
     header: 'Date From',
-    cell: (info) => <span className="text-[12.5px]">{formatDate(info.getValue())}</span>,
+    cell: (info) => <span className="text-[12.5px] whitespace-nowrap">{formatDate(info.getValue())}</span>,
   }),
   col.accessor('dateTo', {
     header: 'Date To',
-    cell: (info) => <span className="text-[12.5px]">{formatDate(info.getValue())}</span>,
+    cell: (info) => <span className="text-[12.5px] whitespace-nowrap">{formatDate(info.getValue())}</span>,
+  }),
+  col.accessor('totalDays', {
+    header: () => <span className="block text-right whitespace-nowrap">Total Days</span>,
+    cell: (info) => (
+      <span className="font-mono text-[12.5px] block text-right font-medium whitespace-nowrap">
+        {info.getValue()}
+      </span>
+    ),
   }),
 ];
 
@@ -50,33 +68,58 @@ function escCsv(v: string | number | null | undefined): string {
   return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
+const SELECT_CLS =
+  'bg-ground border border-border rounded-[5px] px-2 py-1.5 text-[12.5px] text-app-text focus:outline-none focus:ring-2 focus:ring-app-blue/40';
+
 export function LeaveTable({ data, start, end }: LeaveTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [search, setSearch] = useState('');
+  const [dept, setDept] = useState('');
+  const [leaveType, setLeaveType] = useState('');
+
+  const departments = useMemo(() => {
+    const set = new Set<string>();
+    data.forEach((r) => { if (r.department) set.add(r.department); });
+    return Array.from(set).sort();
+  }, [data]);
+
+  const leaveTypes = useMemo(() => {
+    const set = new Set<string>();
+    data.forEach((r) => { if (r.leaveType) set.add(r.leaveType); });
+    return Array.from(set).sort();
+  }, [data]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return data;
-    return data.filter((r) =>
-      (r.name ?? '').toLowerCase().includes(q) ||
-      r.employeeId.toLowerCase().includes(q) ||
-      (r.leaveType ?? '').toLowerCase().includes(q));
-  }, [data, search]);
+    return data.filter((r) => {
+      if (dept && r.department !== dept) return false;
+      if (leaveType && r.leaveType !== leaveType) return false;
+      if (!q) return true;
+      return (
+        (r.name ?? '').toLowerCase().includes(q) ||
+        r.employeeId.toLowerCase().includes(q)
+      );
+    });
+  }, [data, search, dept, leaveType]);
 
   function exportCsv() {
     const rows: string[][] = [
       ['Date range', `${start} to ${end}`],
+      ['Department', dept || 'All'],
+      ['Leave Type', leaveType || 'All'],
       ['Status', 'Approved only'],
       ['Records exported', String(filtered.length)],
       [],
-      ['Employee ID', 'Name', 'Leave Type', 'Date Filed', 'Date From', 'Date To'],
+      ['Employee ID', 'Name', 'Department', 'Leave Type', 'Date Filed', 'Date From', 'Date To', 'Total Days'],
       ...filtered.map((r) => [
         r.employeeId,
         r.name ?? '',
+        r.department ?? '',
         r.leaveType ?? '',
         r.dateFiled ?? '',
         r.dateFrom,
         r.dateTo,
+        String(r.totalDays),
       ]),
     ];
     const csv = rows.map((r) => r.map(escCsv).join(',')).join('\r\n');
@@ -99,9 +142,35 @@ export function LeaveTable({ data, start, end }: LeaveTableProps) {
 
   return (
     <div className="bg-white border border-border rounded-[7px] overflow-clip flex flex-col flex-1 min-h-0">
-      <div className="px-5 py-3 border-b border-border flex items-center gap-3 flex-shrink-0">
+      <div className="px-5 py-3 border-b border-border flex items-center gap-3 flex-wrap flex-shrink-0">
         <span className="text-[13.5px] font-semibold text-app-text flex-shrink-0">Approved Leaves</span>
-        <div className="flex-1 relative">
+
+        {/* Department filter */}
+        <select
+          value={dept}
+          onChange={(e) => setDept(e.target.value)}
+          className={`${SELECT_CLS} flex-shrink-0`}
+        >
+          <option value="">All Departments</option>
+          {departments.map((d) => (
+            <option key={d} value={d}>{d}</option>
+          ))}
+        </select>
+
+        {/* Leave type filter */}
+        <select
+          value={leaveType}
+          onChange={(e) => setLeaveType(e.target.value)}
+          className={`${SELECT_CLS} flex-shrink-0`}
+        >
+          <option value="">All Leave Types</option>
+          {leaveTypes.map((t) => (
+            <option key={t} value={t}>{t}</option>
+          ))}
+        </select>
+
+        {/* Search */}
+        <div className="flex-1 relative min-w-[160px]">
           <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
           </svg>
@@ -113,9 +182,11 @@ export function LeaveTable({ data, start, end }: LeaveTableProps) {
             className="w-full pl-8 pr-3 py-1.5 text-[12.5px] bg-ground border border-border rounded-[5px] focus:outline-none focus:ring-2 focus:ring-app-blue/40 placeholder:text-muted"
           />
         </div>
+
         <span className="text-[11.5px] text-muted flex-shrink-0">
-          {filtered.length}{search ? ` of ${data.length}` : ''} leaves
+          {filtered.length}{(search || dept || leaveType) ? ` of ${data.length}` : ''} leaves
         </span>
+
         <button
           onClick={exportCsv}
           disabled={filtered.length === 0}
@@ -127,8 +198,19 @@ export function LeaveTable({ data, start, end }: LeaveTableProps) {
           Export CSV
         </button>
       </div>
+
       <div className="overflow-auto flex-1 min-h-0">
-        <table className="w-full border-collapse">
+        <table className="w-full border-collapse table-fixed">
+          <colgroup>
+            <col style={{ width: '100px' }} />  {/* Employee ID */}
+            <col />                              {/* Name — flexible */}
+            <col />                              {/* Department — flexible */}
+            <col style={{ width: '130px' }} />  {/* Leave Type */}
+            <col style={{ width: '110px' }} />  {/* Date Filed */}
+            <col style={{ width: '110px' }} />  {/* Date From */}
+            <col style={{ width: '110px' }} />  {/* Date To */}
+            <col style={{ width: '88px' }} />   {/* Total Days */}
+          </colgroup>
           <thead className="sticky top-0 z-10 bg-ground">
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id} className="border-b border-border">

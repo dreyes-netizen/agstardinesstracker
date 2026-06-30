@@ -1,5 +1,5 @@
 import { db } from '@/lib/db';
-import { leaveRecords } from '@/lib/db/schema';
+import { leaveRecords, employees } from '@/lib/db/schema';
 import { and, asc, eq, gte, lte, sql } from 'drizzle-orm';
 import { getRosterEmployeeIds } from './employees';
 import type { ParsedLeaveRecord } from '@/lib/parsers/leave';
@@ -56,14 +56,16 @@ export async function replaceLeaveFromReport(
 export interface ApprovedLeaveRow {
   employeeId: string;
   name: string | null;
+  department: string | null;
   leaveType: string | null;
   dateFiled: string | null;
   dateFrom: string;
   dateTo: string;
+  totalDays: number;
 }
 
 // Approved leaves whose [dateFrom, dateTo] overlaps the selected range.
-// Used by the Leave Report page (columns A–F only).
+// Joined with roster for department; totalDays = withPayDays + woutPayDays.
 export async function getApprovedLeaves(
   start: string,
   end: string,
@@ -76,12 +78,15 @@ export async function getApprovedLeaves(
       dateFiled: leaveRecords.dateFiled,
       dateFrom: leaveRecords.dateFrom,
       dateTo: leaveRecords.dateTo,
+      withPayDays: leaveRecords.withPayDays,
+      woutPayDays: leaveRecords.woutPayDays,
+      department: employees.department,
     })
     .from(leaveRecords)
+    .leftJoin(employees, eq(leaveRecords.employeeId, employees.employeeId))
     .where(
       and(
         eq(leaveRecords.status, 'Approved'),
-        // overlap: from <= end AND to >= start
         lte(leaveRecords.dateFrom, end),
         gte(leaveRecords.dateTo, start),
       ),
@@ -91,10 +96,12 @@ export async function getApprovedLeaves(
   return rows.map((r) => ({
     employeeId: r.employeeId,
     name: r.name,
+    department: r.department ?? null,
     leaveType: r.leaveType,
     dateFiled: r.dateFiled,
     dateFrom: r.dateFrom,
     dateTo: r.dateTo,
+    totalDays: Number(r.withPayDays ?? 0) + Number(r.woutPayDays ?? 0),
   }));
 }
 

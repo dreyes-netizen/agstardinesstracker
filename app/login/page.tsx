@@ -17,7 +17,7 @@ export default function LoginPage() {
             className="h-[72px] w-auto mb-4"
           />
           <p className="font-mono text-[10px] tracking-[0.16em] uppercase text-muted mb-1">
-            AGS Internal
+            Alliance Global Solutions
           </p>
           <h1 className="text-[20px] font-semibold text-app-text tracking-tight">
             Attendance Hub
