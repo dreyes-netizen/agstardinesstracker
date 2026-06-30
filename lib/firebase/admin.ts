@@ -11,6 +11,15 @@ import { getAuth, type Auth } from 'firebase-admin/auth';
 
 let cached: Auth | null = null;
 
+// Prefer a base64-encoded key (FIREBASE_PRIVATE_KEY_BASE64) — multi-line PEMs
+// with "\n" are unreliable to set via the Vercel CLI. Fall back to the raw key
+// with literal "\n" restored (used for local .env.local).
+function getPrivateKey(): string | undefined {
+  const b64 = process.env.FIREBASE_PRIVATE_KEY_BASE64;
+  if (b64) return Buffer.from(b64, 'base64').toString('utf8');
+  return process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+}
+
 export function getAdminAuth(): Auth {
   if (cached) return cached;
   const app: App = getApps().length
@@ -19,8 +28,7 @@ export function getAdminAuth(): Auth {
         credential: cert({
           projectId: process.env.FIREBASE_PROJECT_ID,
           clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-          // Env vars store the key with literal "\n" — restore real newlines.
-          privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+          privateKey: getPrivateKey(),
         }),
       });
   cached = getAuth(app);
