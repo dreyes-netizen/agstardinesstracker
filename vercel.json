@@ -1,0 +1,10 @@
+{
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [{ "type": "host", "value": "agstardinesstracker.vercel.app" }],
+      "destination": "https://agsattendancehub.vercel.app/$1",
+      "permanent": true
+    }
+  ]
+}
