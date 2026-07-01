@@ -1,8 +1,9 @@
 'use client';
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { formatDate } from '@/lib/utils/date';
+import { useFilterContext } from '@/context/FilterContext';
 
 interface LeaveFilterBarProps {
   start: string;
@@ -24,14 +25,30 @@ export function LeaveFilterBar({ start, end, latestRange }: LeaveFilterBarProps)
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { leave: savedLeave, setLeave } = useFilterContext();
+
+  // Restore saved filters when navigating here without URL params
+  useEffect(() => {
+    if (!searchParams.get('start') && savedLeave) {
+      const params = new URLSearchParams();
+      params.set('start', savedLeave.start);
+      params.set('end', savedLeave.end);
+      router.replace(`${pathname}?${params.toString()}`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const pushParams = useCallback(
     (mut: (p: URLSearchParams) => void) => {
       const params = new URLSearchParams(searchParams.toString());
       mut(params);
       router.push(`${pathname}?${params.toString()}`);
+      setLeave({
+        start: params.get('start') || start,
+        end: params.get('end') || end,
+      });
     },
-    [router, pathname, searchParams],
+    [router, pathname, searchParams, start, end, setLeave],
   );
 
   const updateParam = (key: string, value: string) =>

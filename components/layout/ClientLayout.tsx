@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { Sidebar } from './Sidebar';
+import { FilterProvider } from '@/context/FilterContext';
 
 export interface NavUser {
   email: string;
@@ -35,7 +36,7 @@ export function ClientLayout({ children, user }: { children: ReactNode; user: Na
         </header>
 
         <main className="flex-1 overflow-y-auto">
-          {children}
+          <FilterProvider>{children}</FilterProvider>
         </main>
       </div>
     </div>

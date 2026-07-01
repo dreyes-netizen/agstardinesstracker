@@ -1,8 +1,9 @@
 'use client';
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { formatDate } from '@/lib/utils/date';
+import { useFilterContext } from '@/context/FilterContext';
 
 interface Combination {
   department: string | null;
@@ -41,6 +42,21 @@ export function ScoreFilterBar({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { score: savedScore, setScore } = useFilterContext();
+
+  // Restore saved filters when navigating here without URL params
+  useEffect(() => {
+    if (!searchParams.get('start') && savedScore) {
+      const params = new URLSearchParams();
+      params.set('start', savedScore.start);
+      params.set('end', savedScore.end);
+      if (savedScore.dept) params.set('dept', savedScore.dept);
+      if (savedScore.supervisor) params.set('supervisor', savedScore.supervisor);
+      if (savedScore.manager) params.set('manager', savedScore.manager);
+      router.replace(`${pathname}?${params.toString()}`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const filteredSupervisors = useMemo(() => {
     if (!selectedDept) return supervisors;
@@ -61,8 +77,15 @@ export function ScoreFilterBar({
       const params = new URLSearchParams(searchParams.toString());
       mut(params);
       router.push(`${pathname}?${params.toString()}`);
+      setScore({
+        start: params.get('start') || start,
+        end: params.get('end') || end,
+        dept: params.get('dept') || '',
+        supervisor: params.get('supervisor') || '',
+        manager: params.get('manager') || '',
+      });
     },
-    [router, pathname, searchParams],
+    [router, pathname, searchParams, start, end, setScore],
   );
 
   const updateParam = useCallback(
