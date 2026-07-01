@@ -56,7 +56,8 @@ export function ScoreFilterBar({
       if (savedScore.manager) params.set('manager', savedScore.manager);
       router.replace(`${pathname}?${params.toString()}`);
     }
-  }, [searchParams, savedScore, router, pathname]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const filteredSupervisors = useMemo(() => {
     if (!selectedDept) return supervisors;

@@ -36,7 +36,8 @@ export function LeaveFilterBar({ start, end, latestRange }: LeaveFilterBarProps)
       params.set('end', savedLeave.end);
       router.replace(`${pathname}?${params.toString()}`);
     }
-  }, [searchParams, savedLeave, router, pathname]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const pushParams = useCallback(
     (mut: (p: URLSearchParams) => void) => {

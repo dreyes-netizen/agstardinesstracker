@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase/client';
 import type { NavUser } from './ClientLayout';
+import { useFilterContext } from '@/context/FilterContext';
 
 const navItems: { href: string; label: string; icon: string; adminOnly?: boolean }[] = [
   { href: '/',                 label: 'Dashboard',        icon: '▦' },
@@ -33,9 +34,26 @@ interface SidebarProps {
   user: NavUser | null;
 }
 
+function buildHref(base: string, params: Record<string, string>): string {
+  const qs = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v)));
+  const s = qs.toString();
+  return s ? `${base}?${s}` : base;
+}
+
 export function Sidebar({ open, onClose, user }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const { dashboard, score, leave } = useFilterContext();
+
+  function navHref(base: string): string {
+    if (base === '/' && dashboard)
+      return buildHref('/', { year: dashboard.year, month: dashboard.month, dept: dashboard.dept, supervisor: dashboard.supervisor, manager: dashboard.manager });
+    if (base === '/attendance-score' && score)
+      return buildHref('/attendance-score', { start: score.start, end: score.end, dept: score.dept, supervisor: score.supervisor, manager: score.manager });
+    if (base === '/leave-report' && leave)
+      return buildHref('/leave-report', { start: leave.start, end: leave.end });
+    return base;
+  }
 
   const visibleNav = navItems.filter((item) => !item.adminOnly || user?.role === 'admin');
 
@@ -99,7 +117,7 @@ export function Sidebar({ open, onClose, user }: SidebarProps) {
             return (
               <Link
                 key={item.href}
-                href={item.href}
+                href={navHref(item.href)}
                 onClick={onClose}
                 className={`flex items-center gap-2.5 px-2.5 py-2 rounded-[5px] text-[13px] transition-colors ${
                   active

@@ -65,7 +65,8 @@ export function FilterBar({
       if (savedDashboard.manager) params.set('manager', savedDashboard.manager);
       router.replace(`${pathname}?${params.toString()}`);
     }
-  }, [searchParams, savedDashboard, router, pathname]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const pushAndSave = useCallback((params: URLSearchParams) => {
     router.push(`${pathname}?${params.toString()}`);
