@@ -13,7 +13,7 @@ interface NteFilterBarProps {
 }
 
 const SELECT_CLS =
-  'bg-ground border border-border rounded-[5px] px-2.5 py-1.5 text-[12.5px] text-app-text focus:outline-none min-w-0';
+  'bg-ground border border-border rounded-[5px] px-2.5 py-1.5 text-[12.5px] text-app-text focus:outline-none min-w-0 w-full md:w-auto';
 const LABEL_CLS = 'text-[12.5px] text-muted';
 
 const MONTH_NAMES = [
@@ -73,7 +73,7 @@ export function NteFilterBar({ months, departments, selectedStatus, selectedYear
   const hasFilters = !!(selectedStatus || selectedDept);
 
   return (
-    <div className="px-6 pb-3 flex items-center gap-6 flex-wrap">
+    <div className="px-4 md:px-6 pb-3 grid grid-cols-2 gap-2 md:flex md:items-center md:gap-6 md:flex-wrap">
       <div className="flex items-center gap-2">
         <span className={LABEL_CLS}>Status</span>
         <select

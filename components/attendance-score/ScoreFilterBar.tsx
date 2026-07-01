@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { formatDate } from '@/lib/utils/date';
 import { useFilterContext } from '@/context/FilterContext';
 
@@ -43,6 +43,7 @@ export function ScoreFilterBar({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { score: savedScore, setScore } = useFilterContext();
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   // Restore saved filters whenever the URL has no params (covers both initial mount
   // and clicking the nav button again while already on this page).
@@ -150,6 +151,15 @@ export function ScoreFilterBar({
         <button className={PRESET_CLS} onClick={last30}>Last 30 days</button>
       </div>
 
+      <button
+        onClick={() => setFiltersOpen((v) => !v)}
+        className="md:hidden text-[12px] text-muted border border-border rounded-[5px] px-2.5 py-1 flex items-center gap-1"
+        aria-expanded={filtersOpen}
+      >
+        Filters {filtersOpen ? '▴' : '▾'}
+      </button>
+
+      <div className={`${filtersOpen ? 'flex flex-wrap gap-x-4 gap-y-2 w-full' : 'hidden'} md:contents`}>
       <div className="flex items-center gap-2">
         <span className={LABEL_CLS}>Dept</span>
         <select value={selectedDept ?? ''} onChange={(e) => handleDeptChange(e.target.value)} className={SELECT_CLS}>
@@ -172,6 +182,7 @@ export function ScoreFilterBar({
           <option value="">{selectedDept ? `All (${filteredManagers.length})` : 'All Managers'}</option>
           {filteredManagers.map((m) => <option key={m} value={m}>{m}</option>)}
         </select>
+      </div>
       </div>
     </div>
   );

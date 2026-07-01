@@ -10,9 +10,12 @@ import { formatDate } from '@/lib/utils/date';
 
 const col = createColumnHelper<ApprovedLeaveRow>();
 
+const hide = { hideMobile: true };
+
 const columns = [
   col.accessor('employeeId', {
     header: 'Employee ID',
+    meta: hide,
     cell: (info) => <span className="font-mono text-[12px] whitespace-nowrap">{info.getValue()}</span>,
   }),
   col.accessor('name', {
@@ -25,6 +28,7 @@ const columns = [
   }),
   col.accessor('department', {
     header: 'Department',
+    meta: hide,
     cell: (info) => (
       <span className="text-muted text-[12px] block truncate" title={info.getValue() ?? undefined}>
         {info.getValue() ?? '—'}
@@ -37,6 +41,7 @@ const columns = [
   }),
   col.accessor('dateFiled', {
     header: 'Date Filed',
+    meta: hide,
     cell: (info) => <span className="text-[12.5px] text-muted whitespace-nowrap">{formatDate(info.getValue())}</span>,
   }),
   col.accessor('dateFrom', {
@@ -227,17 +232,7 @@ export function LeaveTable({ data, start, end }: LeaveTableProps) {
       </div>
 
       <div className="overflow-auto flex-1 min-h-0">
-        <table className="w-full border-collapse table-fixed">
-          <colgroup>
-            <col style={{ width: '100px' }} />  {/* Employee ID */}
-            <col />                              {/* Name — flexible */}
-            <col />                              {/* Department — flexible */}
-            <col style={{ width: '130px' }} />  {/* Leave Type */}
-            <col style={{ width: '110px' }} />  {/* Date Filed */}
-            <col style={{ width: '110px' }} />  {/* Date From */}
-            <col style={{ width: '110px' }} />  {/* Date To */}
-            <col style={{ width: '88px' }} />   {/* Total Days */}
-          </colgroup>
+        <table className="w-full border-collapse">
           <thead className="sticky top-0 z-10 bg-ground">
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id} className="border-b border-border">
@@ -245,7 +240,7 @@ export function LeaveTable({ data, start, end }: LeaveTableProps) {
                   <th
                     key={header.id}
                     onClick={header.column.getToggleSortingHandler()}
-                    className="px-3.5 py-2.5 text-left font-mono text-[10px] tracking-[0.09em] uppercase text-muted cursor-pointer hover:text-app-text select-none first:pl-5 last:pr-5"
+                    className={`px-3.5 py-2.5 text-left font-mono text-[10px] tracking-[0.09em] uppercase text-muted cursor-pointer hover:text-app-text select-none first:pl-5 last:pr-5${(header.column.columnDef as any).meta?.hideMobile ? ' hidden md:table-cell' : ''}`}
                   >
                     {flexRender(header.column.columnDef.header, header.getContext())}
                     {{ asc: ' ↑', desc: ' ↓' }[header.column.getIsSorted() as string] ?? ''}
@@ -258,7 +253,7 @@ export function LeaveTable({ data, start, end }: LeaveTableProps) {
             {table.getRowModel().rows.map((row, i) => (
               <tr key={row.id} className={`border-b border-row-border transition-colors ${i % 2 === 1 ? 'bg-row-alt' : ''} hover:bg-row-hover`}>
                 {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id} className="px-3.5 py-[10px] text-[13px] first:pl-5 last:pr-5">
+                  <td key={cell.id} className={`px-3.5 py-[10px] text-[13px] first:pl-5 last:pr-5${(cell.column.columnDef as any).meta?.hideMobile ? ' hidden md:table-cell' : ''}`}>
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </td>
                 ))}

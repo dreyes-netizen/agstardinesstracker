@@ -11,9 +11,12 @@ import { EmployeeDrawer } from './EmployeeDrawer';
 
 const col = createColumnHelper<EmployeeMonthlyStats>();
 
+const hide = { hideMobile: true };
+
 const columns = [
   col.accessor('employeeId', {
     header: 'Employee ID',
+    meta: hide,
     cell: (info) => <span className="font-mono text-[12px]">{info.getValue()}</span>,
   }),
   col.display({
@@ -28,10 +31,12 @@ const columns = [
   }),
   col.accessor('department', {
     header: 'Department',
+    meta: hide,
     cell: (info) => <span className="text-muted text-[12px]">{info.getValue() ?? '—'}</span>,
   }),
   col.accessor('immediateSupervisor', {
     header: 'Supervisor',
+    meta: hide,
     cell: (info) => <span className="text-muted text-[12px]">{info.getValue() ?? '—'}</span>,
   }),
   col.accessor('lateCount', {
@@ -44,6 +49,7 @@ const columns = [
   }),
   col.accessor('accumulatedMinutes', {
     header: () => <span className="block text-right">Accum. Min</span>,
+    meta: hide,
     cell: (info) => (
       <span className="font-mono text-[13px] block text-right">
         {info.getValue()} <span className="text-[10px] text-muted">min</span>
@@ -203,7 +209,7 @@ export function EmployeeTable({ data, year, month, dept, supervisor, manager }: 
                     <th
                       key={header.id}
                       onClick={header.column.getToggleSortingHandler()}
-                      className="px-3.5 py-2.5 text-left font-mono text-[10px] tracking-[0.09em] uppercase text-muted cursor-pointer hover:text-app-text select-none first:pl-5 last:pr-5"
+                      className={`px-3.5 py-2.5 text-left font-mono text-[10px] tracking-[0.09em] uppercase text-muted cursor-pointer hover:text-app-text select-none first:pl-5 last:pr-5${(header.column.columnDef as any).meta?.hideMobile ? ' hidden md:table-cell' : ''}`}
                     >
                       {flexRender(header.column.columnDef.header, header.getContext())}
                       {{ asc: ' ↑', desc: ' ↓' }[header.column.getIsSorted() as string] ?? ''}
@@ -223,7 +229,7 @@ export function EmployeeTable({ data, year, month, dept, supervisor, manager }: 
                   className={`border-b border-row-border cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-blue focus-visible:ring-inset ${i % 2 === 1 ? 'bg-row-alt' : ''} ${selected?.employeeId === row.original.employeeId ? 'bg-row-active' : 'hover:bg-row-hover'}`}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-3.5 py-[11px] text-[13px] first:pl-5 last:pr-5">
+                    <td key={cell.id} className={`px-3.5 py-[11px] text-[13px] first:pl-5 last:pr-5${(cell.column.columnDef as any).meta?.hideMobile ? ' hidden md:table-cell' : ''}`}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   ))}

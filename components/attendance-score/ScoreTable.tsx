@@ -17,9 +17,12 @@ const numCellCls = 'font-mono text-[12.5px] block text-right';
 // so the rows that actually have values stand out. CSV export keeps real numbers.
 const dash = <span className="text-muted/50">—</span>;
 
+const hide = { hideMobile: true };
+
 const columns = [
   col.accessor('employeeId', {
     header: 'ID No',
+    meta: hide,
     cell: (info) => <span className="font-mono text-[12px]">{info.getValue()}</span>,
   }),
   col.accessor('fullName', {
@@ -28,26 +31,32 @@ const columns = [
   }),
   col.accessor('account', {
     header: 'Account',
+    meta: hide,
     cell: (info) => <span className="text-muted text-[12px]">{info.getValue() ?? '—'}</span>,
   }),
   col.accessor('teamLeader', {
     header: 'Team Leader',
+    meta: hide,
     cell: (info) => <span className="text-muted text-[12px]">{info.getValue() ?? '—'}</span>,
   }),
   col.accessor('accountManager', {
     header: 'Account Manager',
+    meta: hide,
     cell: (info) => <span className="text-muted text-[12px]">{info.getValue() ?? '—'}</span>,
   }),
   col.accessor('totalHoursPresent', {
     header: () => <span className={rightHead}>Hrs Present</span>,
+    meta: hide,
     cell: (info) => <span className={numCellCls}>{h2(info.getValue())}</span>,
   }),
   col.accessor('totalHoursAbsent', {
     header: () => <span className={rightHead}>Hrs Absent</span>,
+    meta: hide,
     cell: (info) => { const v = info.getValue(); return <span className={numCellCls}>{v > 0 ? h2(v) : dash}</span>; },
   }),
   col.accessor('totalSickLeaveHours', {
     header: () => <span className={rightHead}>Sick Hrs</span>,
+    meta: hide,
     cell: (info) => {
       const v = info.getValue();
       return (
@@ -59,10 +68,12 @@ const columns = [
   }),
   col.accessor('undertime', {
     header: () => <span className={rightHead}>Undertime/Late</span>,
+    meta: hide,
     cell: (info) => { const v = info.getValue(); return <span className={numCellCls}>{v > 0 ? fmtDuration(v) : dash}</span>; },
   }),
   col.accessor('requiredHours', {
     header: () => <span className={rightHead}>Required Hrs</span>,
+    meta: hide,
     cell: (info) => <span className={numCellCls}>{h2(info.getValue())}</span>,
   }),
   col.accessor('attendancePct', {
@@ -206,7 +217,7 @@ export function ScoreTable({ data, start, end, dept, supervisor, manager }: Scor
                   <th
                     key={header.id}
                     onClick={header.column.getToggleSortingHandler()}
-                    className="px-3.5 py-2.5 text-left font-mono text-[10px] tracking-[0.09em] uppercase text-muted cursor-pointer hover:text-app-text select-none first:pl-5 last:pr-5"
+                    className={`px-3.5 py-2.5 text-left font-mono text-[10px] tracking-[0.09em] uppercase text-muted cursor-pointer hover:text-app-text select-none first:pl-5 last:pr-5${(header.column.columnDef as any).meta?.hideMobile ? ' hidden md:table-cell' : ''}`}
                   >
                     {flexRender(header.column.columnDef.header, header.getContext())}
                     {{ asc: ' ↑', desc: ' ↓' }[header.column.getIsSorted() as string] ?? ''}
@@ -226,7 +237,7 @@ export function ScoreTable({ data, start, end, dept, supervisor, manager }: Scor
                 className={`border-b border-row-border cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-blue focus-visible:ring-inset ${i % 2 === 1 ? 'bg-row-alt' : ''} ${selected?.employeeId === row.original.employeeId ? 'bg-row-active' : 'hover:bg-row-hover'}`}
               >
                 {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id} className="px-3.5 py-[10px] text-[13px] first:pl-5 last:pr-5">
+                  <td key={cell.id} className={`px-3.5 py-[10px] text-[13px] first:pl-5 last:pr-5${(cell.column.columnDef as any).meta?.hideMobile ? ' hidden md:table-cell' : ''}`}>
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </td>
                 ))}

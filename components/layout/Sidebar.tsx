@@ -85,24 +85,22 @@ export function Sidebar({ open, onClose, user }: SidebarProps) {
           ${open ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
         `}
       >
-        <div className="px-5 py-[18px] border-b border-white/[0.07] flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="bg-white rounded-[6px] p-1 flex-shrink-0">
-              <Image src="/agslogo.png" alt="Alliance Global Solutions" width={42} height={36} className="h-9 w-auto" />
-            </div>
-            <div className="min-w-0">
-              <p className="font-mono text-[9px] tracking-[0.16em] uppercase text-white/50 mb-0.5">
-                Alliance Global Solutions
-              </p>
-              <p className="text-[14px] font-semibold text-white tracking-tight truncate">
-                Attendance Hub
-              </p>
-            </div>
+        <div className="px-5 py-[18px] border-b border-white/[0.07] flex items-center gap-2.5 relative">
+          <div className="bg-white rounded-[6px] p-1 flex-shrink-0">
+            <Image src="/agslogo.png" alt="Alliance Global Solutions" width={42} height={36} className="h-9 w-auto" />
           </div>
-          {/* Close button — mobile only */}
+          <div className="min-w-0">
+            <p className="font-mono text-[9px] tracking-[0.16em] uppercase text-white/50 mb-0.5">
+              Alliance Global Solutions
+            </p>
+            <p className="text-[14px] font-semibold text-white tracking-tight">
+              Attendance Hub
+            </p>
+          </div>
+          {/* Close button — mobile only, absolutely positioned so it doesn't compress the title */}
           <button
             onClick={onClose}
-            className="md:hidden text-white/50 hover:text-white w-7 h-7 flex items-center justify-center rounded text-xl leading-none"
+            className="md:hidden absolute right-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white w-7 h-7 flex items-center justify-center rounded text-xl leading-none"
             aria-label="Close navigation"
           >
             ×

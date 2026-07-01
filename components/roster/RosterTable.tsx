@@ -112,22 +112,29 @@ export function RosterTable({ employees }: { employees: Employee[] }) {
         <table className="w-full border-collapse">
           <thead className="sticky top-0 z-10 bg-ground">
             <tr className="border-b border-border">
-              {['Employee ID', 'Name', 'Department', 'Immediate Supervisor', 'Manager (Approver 2)', 'Hire Date'].map((h) => (
-                <th key={h} className="px-4 py-2.5 text-left font-mono text-[10px] tracking-[0.09em] uppercase text-muted first:pl-5 last:pr-5 whitespace-nowrap">{h}</th>
+              {[
+                { h: 'Employee ID', extra: ' hidden md:table-cell' },
+                { h: 'Name', extra: '' },
+                { h: 'Department', extra: '' },
+                { h: 'Immediate Supervisor', extra: ' hidden md:table-cell' },
+                { h: 'Manager (Approver 2)', extra: ' hidden md:table-cell' },
+                { h: 'Hire Date', extra: ' hidden md:table-cell' },
+              ].map(({ h, extra }) => (
+                <th key={h} className={`px-4 py-2.5 text-left font-mono text-[10px] tracking-[0.09em] uppercase text-muted first:pl-5 last:pr-5 whitespace-nowrap${extra}`}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {paginated.map((emp, i) => (
               <tr key={emp.employeeId} className={`border-b border-[#EEF1F4] ${i % 2 === 1 ? 'bg-[#F6F8FA]' : ''}`}>
-                <td className="px-4 py-2.5 first:pl-5 font-mono text-[12px]">{emp.employeeId}</td>
+                <td className="px-4 py-2.5 first:pl-5 font-mono text-[12px] hidden md:table-cell">{emp.employeeId}</td>
                 <td className="px-4 py-2.5 font-medium text-[13px] whitespace-nowrap">
                   {emp.lastName}, {emp.firstName}{emp.middleName ? ` ${emp.middleName.charAt(0)}.` : ''}
                 </td>
                 <td className="px-4 py-2.5 text-[12px] text-muted">{emp.department ?? '—'}</td>
-                <td className="px-4 py-2.5 text-[12px] text-muted">{emp.immediateSupervisor ?? '—'}</td>
-                <td className="px-4 py-2.5 text-[12px] text-muted">{emp.approver2 ?? '—'}</td>
-                <td className="px-4 py-2.5 last:pr-5 font-mono text-[12px] text-muted">{emp.hireDate ?? '—'}</td>
+                <td className="px-4 py-2.5 text-[12px] text-muted hidden md:table-cell">{emp.immediateSupervisor ?? '—'}</td>
+                <td className="px-4 py-2.5 text-[12px] text-muted hidden md:table-cell">{emp.approver2 ?? '—'}</td>
+                <td className="px-4 py-2.5 last:pr-5 font-mono text-[12px] text-muted hidden md:table-cell">{emp.hireDate ?? '—'}</td>
               </tr>
             ))}
             {filtered.length === 0 && (

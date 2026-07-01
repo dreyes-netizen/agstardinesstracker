@@ -76,7 +76,11 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           lateCount={lateCount}
           totalEmployees={employees.length}
         />
-        {dataExists && <DayOfWeekCards stats={dowStats} totalEmployees={employees.length} />}
+        {dataExists && (
+          <div className="hidden md:block">
+            <DayOfWeekCards stats={dowStats} totalEmployees={employees.length} />
+          </div>
+        )}
         {dataExists ? (
           <EmployeeTable data={employees} year={year} month={month} dept={dept} supervisor={supervisor} manager={manager} />
         ) : (

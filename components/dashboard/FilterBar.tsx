@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { formatDate } from '@/lib/utils/date';
 import { useFilterContext } from '@/context/FilterContext';
 
@@ -52,6 +52,7 @@ export function FilterBar({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { dashboard: savedDashboard, setDashboard } = useFilterContext();
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   // Restore saved filters whenever the URL has no params (covers both initial mount
   // and clicking the nav button again while already on this page).
@@ -155,16 +156,24 @@ export function FilterBar({
   const latestDateLabel = latestDate ? formatDate(latestDate) : null;
 
   return (
-    <div className="bg-white border-b border-border px-6 py-3 flex items-center gap-6 flex-wrap">
+    <div className="bg-white border-b border-border px-4 md:px-6 py-3 flex items-center gap-4 md:gap-6 flex-wrap">
       <h1 className="text-[15px] font-semibold text-app-text tracking-tight mr-2">
         {monthLabel} {year}
       </h1>
       {latestDateLabel && (
-        <span className="text-[11.5px] text-muted ml-auto">
+        <span className="hidden md:inline text-[11.5px] text-muted ml-auto">
           Data through <span className="font-medium text-app-text">{latestDateLabel}</span>
         </span>
       )}
+      <button
+        onClick={() => setFiltersOpen((v) => !v)}
+        className="md:hidden ml-auto text-[12px] text-muted border border-border rounded-[5px] px-2.5 py-1 flex items-center gap-1"
+        aria-expanded={filtersOpen}
+      >
+        Filters {filtersOpen ? '▴' : '▾'}
+      </button>
 
+      <div className={`${filtersOpen ? 'flex flex-wrap gap-x-4 gap-y-2 w-full' : 'hidden'} md:contents`}>
       <div className="flex items-center gap-2">
         <span className={LABEL_CLS}>Month</span>
         <select
@@ -225,6 +234,7 @@ export function FilterBar({
           <option value="">{selectedDept ? `All (${filteredManagers.length})` : 'All Managers'}</option>
           {filteredManagers.map((m) => <option key={m} value={m}>{m}</option>)}
         </select>
+      </div>
       </div>
     </div>
   );

@@ -65,7 +65,7 @@ export function UsersManager({
   function renderRow(u: Row, i: number) {
     return (
       <tr key={u.email} className={`border-b border-row-border ${i % 2 === 1 ? 'bg-row-alt' : ''}`}>
-        <td className="px-4 py-2.5 font-mono text-[12px] text-muted whitespace-nowrap">{u.employeeId ?? '—'}</td>
+        <td className="px-4 py-2.5 font-mono text-[12px] text-muted whitespace-nowrap hidden md:table-cell">{u.employeeId ?? '—'}</td>
         <td className="px-4 py-2.5">
           <input
             type="text"
@@ -80,7 +80,7 @@ export function UsersManager({
             className="w-40 text-[13px] text-app-text bg-transparent border border-transparent hover:border-border focus:border-app-blue/40 rounded-[4px] px-1.5 py-1 focus:outline-none placeholder:text-muted"
           />
         </td>
-        <td className="px-4 py-2.5 text-[12.5px] text-muted whitespace-nowrap">{u.department ?? '—'}</td>
+        <td className="px-4 py-2.5 text-[12.5px] text-muted whitespace-nowrap hidden md:table-cell">{u.department ?? '—'}</td>
         <td className="px-4 py-2.5 text-[13px] whitespace-nowrap">
           {u.email}
           {u.email === currentEmail && <span className="ml-2 text-[10px] uppercase tracking-[0.06em] text-muted">you</span>}
@@ -131,8 +131,16 @@ export function UsersManager({
           <table className="w-full border-collapse">
             <thead className="bg-ground">
               <tr className="border-b border-border">
-                {['Emp ID', 'Name', 'Department', 'Email', 'Role', 'Status', ''].map((h, i) => (
-                  <th key={i} className={HEAD}>{h}</th>
+                {[
+                  { h: 'Emp ID', extra: ' hidden md:table-cell' },
+                  { h: 'Name', extra: '' },
+                  { h: 'Department', extra: ' hidden md:table-cell' },
+                  { h: 'Email', extra: '' },
+                  { h: 'Role', extra: '' },
+                  { h: 'Status', extra: '' },
+                  { h: '', extra: '' },
+                ].map(({ h, extra }, i) => (
+                  <th key={i} className={`${HEAD}${extra}`}>{h}</th>
                 ))}
               </tr>
             </thead>

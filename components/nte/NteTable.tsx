@@ -118,8 +118,17 @@ export function NteTable({ rows }: { rows: NteRow[] }) {
         <table className="w-full border-collapse">
           <thead className="sticky top-0 z-10 bg-ground">
             <tr className="border-b border-border">
-              {['Employee', 'Month', 'Department', 'Supervisor', 'Late Count', 'Accum. Min', 'Status', 'Issued By / Action'].map((h) => (
-                <th key={h} className="px-4 py-2.5 text-left font-mono text-[10px] tracking-[0.09em] uppercase text-muted first:pl-5">{h}</th>
+              {[
+                { h: 'Employee', extra: '' },
+                { h: 'Month', extra: '' },
+                { h: 'Department', extra: ' hidden md:table-cell' },
+                { h: 'Supervisor', extra: ' hidden md:table-cell' },
+                { h: 'Late Count', extra: ' hidden md:table-cell' },
+                { h: 'Accum. Min', extra: ' hidden md:table-cell' },
+                { h: 'Status', extra: '' },
+                { h: 'Issued By / Action', extra: '' },
+              ].map(({ h, extra }) => (
+                <th key={h} className={`px-4 py-2.5 text-left font-mono text-[10px] tracking-[0.09em] uppercase text-muted first:pl-5${extra}`}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -139,10 +148,10 @@ export function NteTable({ rows }: { rows: NteRow[] }) {
                   <td className="px-4 py-3 text-[12px] text-app-text whitespace-nowrap">
                   {new Date(row.month + '-01T00:00:00').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                 </td>
-                  <td className="px-4 py-3 text-[12px] text-muted">{row.department ?? '—'}</td>
-                  <td className="px-4 py-3 text-[12px] text-muted">{row.immediate_supervisor ?? '—'}</td>
-                  <td className="px-4 py-3 font-mono text-[13px] text-right">{row.late_count} <span className="text-[10px] text-muted">×</span></td>
-                  <td className="px-4 py-3 font-mono text-[13px] text-right">{row.accumulated_minutes} <span className="text-[10px] text-muted">min</span></td>
+                  <td className="px-4 py-3 text-[12px] text-muted hidden md:table-cell">{row.department ?? '—'}</td>
+                  <td className="px-4 py-3 text-[12px] text-muted hidden md:table-cell">{row.immediate_supervisor ?? '—'}</td>
+                  <td className="px-4 py-3 font-mono text-[13px] text-right hidden md:table-cell">{row.late_count} <span className="text-[10px] text-muted">×</span></td>
+                  <td className="px-4 py-3 font-mono text-[13px] text-right hidden md:table-cell">{row.accumulated_minutes} <span className="text-[10px] text-muted">min</span></td>
                   <td className="px-4 py-3"><StatusBadge status={row.status as 'required' | 'issued' | 'acknowledged'} /></td>
                   <td className="px-4 py-3 pr-5">
                     {row.status === 'required' && (
