@@ -86,9 +86,17 @@ export function AuditTable({ data }: { data: AuditEntry[] }) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [search, setSearch] = useState('');
   const [actionFilter, setActionFilter] = useState('');
+  const [monthFilter, setMonthFilter] = useState('');
+
+  const months = useMemo(() => {
+    const set = new Set<string>();
+    data.forEach((e) => { if (e.month) set.add(e.month); });
+    return Array.from(set).sort().reverse();
+  }, [data]);
 
   const filtered = useMemo(() => {
     let result = data;
+    if (monthFilter) result = result.filter((e) => e.month === monthFilter);
     if (actionFilter) result = result.filter((e) => e.action === actionFilter);
     const q = search.trim().toLowerCase();
     if (q) {
@@ -136,6 +144,16 @@ export function AuditTable({ data }: { data: AuditEntry[] }) {
           placeholder="Search actor or employee…"
           className="flex-1 px-3 py-1.5 text-[12.5px] bg-ground border border-border rounded-[5px] focus:outline-none focus:ring-2 focus:ring-app-blue/40 placeholder:text-muted"
         />
+        <select
+          value={monthFilter}
+          onChange={(e) => setMonthFilter(e.target.value)}
+          className="flex-shrink-0 bg-ground border border-border rounded-[5px] px-2.5 py-1.5 text-[12.5px] text-app-text focus:outline-none"
+        >
+          <option value="">All months</option>
+          {months.map((m) => (
+            <option key={m} value={m}>{new Date(`${m}-01T00:00:00`).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</option>
+          ))}
+        </select>
         <select
           value={actionFilter}
           onChange={(e) => setActionFilter(e.target.value)}

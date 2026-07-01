@@ -2,8 +2,8 @@
 
 import { useState, useMemo } from 'react';
 import {
-  useReactTable, getCoreRowModel, getSortedRowModel,
-  flexRender, createColumnHelper, SortingState,
+  useReactTable, getCoreRowModel, getSortedRowModel, getPaginationRowModel,
+  flexRender, createColumnHelper, SortingState, PaginationState,
 } from '@tanstack/react-table';
 import { EmployeeMonthlyStats } from '@/lib/queries/attendance';
 import { StatusBadge } from './StatusBadge';
@@ -74,6 +74,7 @@ function escCsv(v: string | number | null | undefined): string {
 
 export function EmployeeTable({ data, year, month, dept, supervisor, manager }: EmployeeTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
+  const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 50 });
   const [selected, setSelected] = useState<EmployeeMonthlyStats | null>(null);
   const [search, setSearch] = useState('');
   const [hideZero, setHideZero] = useState(true);
@@ -129,10 +130,13 @@ export function EmployeeTable({ data, year, month, dept, supervisor, manager }: 
 
   const table = useReactTable({
     data: filtered, columns,
-    state: { sorting },
+    state: { sorting, pagination },
     onSortingChange: setSorting,
+    onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    autoResetPageIndex: true,
   });
 
   return (
@@ -235,6 +239,25 @@ export function EmployeeTable({ data, year, month, dept, supervisor, manager }: 
             </tbody>
           </table>
         </div>
+
+        {table.getPageCount() > 1 && (
+          <div className="px-5 py-2 border-t border-border flex items-center justify-between flex-shrink-0">
+            <span className="text-[11.5px] text-muted">
+              {pagination.pageIndex * pagination.pageSize + 1}–{Math.min((pagination.pageIndex + 1) * pagination.pageSize, filtered.length)} of {filtered.length}
+            </span>
+            <div className="flex items-center gap-2">
+              <button onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}
+                className="px-2.5 py-1 rounded-[5px] border border-border text-[11.5px] text-muted hover:text-app-text disabled:opacity-40 disabled:cursor-not-allowed">
+                ← Prev
+              </button>
+              <span className="text-[11.5px] text-muted">{pagination.pageIndex + 1} / {table.getPageCount()}</span>
+              <button onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}
+                className="px-2.5 py-1 rounded-[5px] border border-border text-[11.5px] text-muted hover:text-app-text disabled:opacity-40 disabled:cursor-not-allowed">
+                Next →
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <EmployeeDrawer

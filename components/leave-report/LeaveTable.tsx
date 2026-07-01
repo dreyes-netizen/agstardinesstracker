@@ -75,6 +75,8 @@ export function LeaveTable({ data, start, end }: LeaveTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [search, setSearch] = useState('');
   const [dept, setDept] = useState('');
+  const [supervisor, setSupervisor] = useState('');
+  const [manager, setManager] = useState('');
   const [leaveType, setLeaveType] = useState('');
 
   const departments = useMemo(() => {
@@ -89,10 +91,33 @@ export function LeaveTable({ data, start, end }: LeaveTableProps) {
     return Array.from(set).sort();
   }, [data]);
 
+  const scoped = useMemo(() => dept ? data.filter((r) => r.department === dept) : data, [data, dept]);
+  const supervisors = useMemo(() => {
+    const set = new Set<string>();
+    scoped.forEach((r) => { if (r.immediateSupervisor) set.add(r.immediateSupervisor); });
+    return Array.from(set).sort();
+  }, [scoped]);
+  const managers = useMemo(() => {
+    const set = new Set<string>();
+    scoped.forEach((r) => { if (r.approver2) set.add(r.approver2); });
+    return Array.from(set).sort();
+  }, [scoped]);
+
+  function handleDeptChange(value: string) {
+    setDept(value);
+    if (value) {
+      const inDept = data.filter((r) => r.department === value);
+      if (supervisor && !inDept.some((r) => r.immediateSupervisor === supervisor)) setSupervisor('');
+      if (manager && !inDept.some((r) => r.approver2 === manager)) setManager('');
+    }
+  }
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return data.filter((r) => {
       if (dept && r.department !== dept) return false;
+      if (supervisor && r.immediateSupervisor !== supervisor) return false;
+      if (manager && r.approver2 !== manager) return false;
       if (leaveType && r.leaveType !== leaveType) return false;
       if (!q) return true;
       return (
@@ -100,12 +125,14 @@ export function LeaveTable({ data, start, end }: LeaveTableProps) {
         r.employeeId.toLowerCase().includes(q)
       );
     });
-  }, [data, search, dept, leaveType]);
+  }, [data, search, dept, supervisor, manager, leaveType]);
 
   function exportCsv() {
     const rows: string[][] = [
       ['Date range', `${start} to ${end}`],
       ['Department', dept || 'All'],
+      ['Supervisor', supervisor || 'All'],
+      ['Manager', manager || 'All'],
       ['Leave Type', leaveType || 'All'],
       ['Status', 'Approved only'],
       ['Records exported', String(filtered.length)],
@@ -146,27 +173,27 @@ export function LeaveTable({ data, start, end }: LeaveTableProps) {
         <span className="text-[13.5px] font-semibold text-app-text flex-shrink-0">Approved Leaves</span>
 
         {/* Department filter */}
-        <select
-          value={dept}
-          onChange={(e) => setDept(e.target.value)}
-          className={`${SELECT_CLS} flex-shrink-0`}
-        >
+        <select value={dept} onChange={(e) => handleDeptChange(e.target.value)} className={`${SELECT_CLS} flex-shrink-0`}>
           <option value="">All Departments</option>
-          {departments.map((d) => (
-            <option key={d} value={d}>{d}</option>
-          ))}
+          {departments.map((d) => <option key={d} value={d}>{d}</option>)}
+        </select>
+
+        {/* Supervisor filter */}
+        <select value={supervisor} onChange={(e) => setSupervisor(e.target.value)} className={`${SELECT_CLS} flex-shrink-0`}>
+          <option value="">{dept ? `All Supervisors (${supervisors.length})` : 'All Supervisors'}</option>
+          {supervisors.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+
+        {/* Manager filter */}
+        <select value={manager} onChange={(e) => setManager(e.target.value)} className={`${SELECT_CLS} flex-shrink-0`}>
+          <option value="">{dept ? `All Managers (${managers.length})` : 'All Managers'}</option>
+          {managers.map((m) => <option key={m} value={m}>{m}</option>)}
         </select>
 
         {/* Leave type filter */}
-        <select
-          value={leaveType}
-          onChange={(e) => setLeaveType(e.target.value)}
-          className={`${SELECT_CLS} flex-shrink-0`}
-        >
+        <select value={leaveType} onChange={(e) => setLeaveType(e.target.value)} className={`${SELECT_CLS} flex-shrink-0`}>
           <option value="">All Leave Types</option>
-          {leaveTypes.map((t) => (
-            <option key={t} value={t}>{t}</option>
-          ))}
+          {leaveTypes.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
 
         {/* Search */}
@@ -184,7 +211,7 @@ export function LeaveTable({ data, start, end }: LeaveTableProps) {
         </div>
 
         <span className="text-[11.5px] text-muted flex-shrink-0">
-          {filtered.length}{(search || dept || leaveType) ? ` of ${data.length}` : ''} leaves
+          {filtered.length}{(search || dept || supervisor || manager || leaveType) ? ` of ${data.length}` : ''} leaves
         </span>
 
         <button

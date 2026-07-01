@@ -57,6 +57,8 @@ export interface ApprovedLeaveRow {
   employeeId: string;
   name: string | null;
   department: string | null;
+  immediateSupervisor: string | null;
+  approver2: string | null;
   leaveType: string | null;
   dateFiled: string | null;
   dateFrom: string;
@@ -81,6 +83,8 @@ export async function getApprovedLeaves(
       withPayDays: leaveRecords.withPayDays,
       woutPayDays: leaveRecords.woutPayDays,
       department: employees.department,
+      immediateSupervisor: employees.immediateSupervisor,
+      approver2: employees.approver2,
     })
     .from(leaveRecords)
     .leftJoin(employees, eq(leaveRecords.employeeId, employees.employeeId))
@@ -97,6 +101,8 @@ export async function getApprovedLeaves(
     employeeId: r.employeeId,
     name: r.name,
     department: r.department ?? null,
+    immediateSupervisor: r.immediateSupervisor ?? null,
+    approver2: r.approver2 ?? null,
     leaveType: r.leaveType,
     dateFiled: r.dateFiled,
     dateFrom: r.dateFrom,

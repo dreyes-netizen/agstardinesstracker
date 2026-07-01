@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Employee } from '@/lib/db/schema';
 
 const SELECT = 'bg-ground border border-border rounded-[5px] px-2.5 py-1.5 text-[12.5px] text-app-text focus:outline-none max-w-[180px]';
@@ -14,6 +14,8 @@ export function RosterTable({ employees }: { employees: Employee[] }) {
   const [dept, setDept] = useState('');
   const [supervisor, setSupervisor] = useState('');
   const [manager, setManager] = useState('');
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 50;
 
   const departments = useMemo(() => uniqSorted(employees.map((e) => e.department)), [employees]);
 
@@ -49,6 +51,11 @@ export function RosterTable({ employees }: { employees: Employee[] }) {
       if (manager && !inDept.some((e) => e.approver2 === manager)) setManager('');
     }
   }
+
+  useEffect(() => { setPage(0); }, [search, dept, supervisor, manager]);
+
+  const pageCount = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   const hasFilters = !!(search || dept || supervisor || manager);
 
@@ -111,7 +118,7 @@ export function RosterTable({ employees }: { employees: Employee[] }) {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((emp, i) => (
+            {paginated.map((emp, i) => (
               <tr key={emp.employeeId} className={`border-b border-[#EEF1F4] ${i % 2 === 1 ? 'bg-[#F6F8FA]' : ''}`}>
                 <td className="px-4 py-2.5 first:pl-5 font-mono text-[12px]">{emp.employeeId}</td>
                 <td className="px-4 py-2.5 font-medium text-[13px] whitespace-nowrap">
@@ -133,6 +140,25 @@ export function RosterTable({ employees }: { employees: Employee[] }) {
           </tbody>
         </table>
       </div>
+
+      {pageCount > 1 && (
+        <div className="px-5 py-2 border-t border-border flex items-center justify-between flex-shrink-0">
+          <span className="text-[11.5px] text-muted">
+            {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filtered.length)} of {filtered.length}
+          </span>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0}
+              className="px-2.5 py-1 rounded-[5px] border border-border text-[11.5px] text-muted hover:text-app-text disabled:opacity-40 disabled:cursor-not-allowed">
+              ← Prev
+            </button>
+            <span className="text-[11.5px] text-muted">{page + 1} / {pageCount}</span>
+            <button onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))} disabled={page >= pageCount - 1}
+              className="px-2.5 py-1 rounded-[5px] border border-border text-[11.5px] text-muted hover:text-app-text disabled:opacity-40 disabled:cursor-not-allowed">
+              Next →
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

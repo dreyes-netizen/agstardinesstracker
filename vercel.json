@@ -6,5 +6,11 @@
       "destination": "https://agsattendancehub.vercel.app/$1",
       "permanent": true
     }
+  ],
+  "headers": [
+    {
+      "source": "/login",
+      "headers": [{ "key": "Cross-Origin-Opener-Policy", "value": "same-origin-allow-popups" }]
+    }
   ]
 }
