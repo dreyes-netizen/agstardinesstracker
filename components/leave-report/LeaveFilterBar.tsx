@@ -27,7 +27,8 @@ export function LeaveFilterBar({ start, end, latestRange }: LeaveFilterBarProps)
   const searchParams = useSearchParams();
   const { leave: savedLeave, setLeave } = useFilterContext();
 
-  // Restore saved filters when navigating here without URL params
+  // Restore saved filters whenever the URL has no params (covers both initial mount
+  // and clicking the nav button again while already on this page).
   useEffect(() => {
     if (!searchParams.get('start') && savedLeave) {
       const params = new URLSearchParams();
@@ -35,8 +36,7 @@ export function LeaveFilterBar({ start, end, latestRange }: LeaveFilterBarProps)
       params.set('end', savedLeave.end);
       router.replace(`${pathname}?${params.toString()}`);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [searchParams, savedLeave, router, pathname]);
 
   const pushParams = useCallback(
     (mut: (p: URLSearchParams) => void) => {

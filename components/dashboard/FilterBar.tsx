@@ -53,7 +53,8 @@ export function FilterBar({
   const searchParams = useSearchParams();
   const { dashboard: savedDashboard, setDashboard } = useFilterContext();
 
-  // Restore saved filters when navigating here without URL params
+  // Restore saved filters whenever the URL has no params (covers both initial mount
+  // and clicking the nav button again while already on this page).
   useEffect(() => {
     if (!searchParams.get('year') && savedDashboard) {
       const params = new URLSearchParams();
@@ -64,8 +65,7 @@ export function FilterBar({
       if (savedDashboard.manager) params.set('manager', savedDashboard.manager);
       router.replace(`${pathname}?${params.toString()}`);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [searchParams, savedDashboard, router, pathname]);
 
   const pushAndSave = useCallback((params: URLSearchParams) => {
     router.push(`${pathname}?${params.toString()}`);

@@ -44,7 +44,8 @@ export function ScoreFilterBar({
   const searchParams = useSearchParams();
   const { score: savedScore, setScore } = useFilterContext();
 
-  // Restore saved filters when navigating here without URL params
+  // Restore saved filters whenever the URL has no params (covers both initial mount
+  // and clicking the nav button again while already on this page).
   useEffect(() => {
     if (!searchParams.get('start') && savedScore) {
       const params = new URLSearchParams();
@@ -55,8 +56,7 @@ export function ScoreFilterBar({
       if (savedScore.manager) params.set('manager', savedScore.manager);
       router.replace(`${pathname}?${params.toString()}`);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [searchParams, savedScore, router, pathname]);
 
   const filteredSupervisors = useMemo(() => {
     if (!selectedDept) return supervisors;
