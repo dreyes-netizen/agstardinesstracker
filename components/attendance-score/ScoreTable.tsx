@@ -58,7 +58,7 @@ const columns = [
     },
   }),
   col.accessor('undertime', {
-    header: () => <span className={rightHead}>Undertime</span>,
+    header: () => <span className={rightHead}>Undertime/Late</span>,
     cell: (info) => { const v = info.getValue(); return <span className={numCellCls}>{v > 0 ? fmtDuration(v) : dash}</span>; },
   }),
   col.accessor('requiredHours', {
@@ -128,7 +128,7 @@ export function ScoreTable({ data, start, end, dept, supervisor, manager }: Scor
       [],
       ['ID No', 'Full Name', 'Account', 'Team Leader', 'Account Manager',
         'Total Hours Present', 'Total Hours Absent', 'Total Sick Leave Hours',
-        'Undertime', 'Required Hours', 'Attendance Percentage', 'Score'],
+        'Undertime/Late', 'Required Hours', 'Attendance Percentage', 'Score'],
       ...filtered.map((e) => [
         e.employeeId,
         e.fullName,

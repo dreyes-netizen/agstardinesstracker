@@ -92,10 +92,10 @@ export function ScoreDrawer({ score, start, end, onClose }: ScoreDrawerProps) {
             </div>
             <div className="flex gap-2">
               {stat('Sick hrs', h2(score.totalSickLeaveHours), score.totalSickLeaveHours > 0 ? 'text-amber' : 'text-app-text')}
-              {stat('Undertime', fmtDuration(score.undertime))}
+              {stat('UT/LT', fmtDuration(score.undertime))}
             </div>
             <p className="text-[11px] text-muted leading-snug">
-              Present = (present days × 8h) − undertime − sick · Score % = present ÷ required
+              Present = (present days × 8h) − UT/LT − sick · Score % = present ÷ required
             </p>
           </div>
 
@@ -119,7 +119,7 @@ export function ScoreDrawer({ score, start, end, onClose }: ScoreDrawerProps) {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border">
-                    {['Date', 'Day', 'Status', 'Hrs', 'Undertime'].map((h, i) => (
+                    {['Date', 'Day', 'Status', 'Hrs', 'UT/LT'].map((h, i) => (
                       <th key={h} className={`font-mono text-[9.5px] tracking-[0.09em] uppercase text-muted pb-2 ${i >= 3 ? 'text-right' : 'text-left'}`}>{h}</th>
                     ))}
                   </tr>
