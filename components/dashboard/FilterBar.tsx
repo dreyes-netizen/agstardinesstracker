@@ -1,8 +1,9 @@
 'use client';
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { formatDate } from '@/lib/utils/date';
+import { useFilterContext } from '@/context/FilterContext';
 
 interface Combination {
   department: string | null;
@@ -50,6 +51,32 @@ export function FilterBar({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { dashboard: savedDashboard, setDashboard } = useFilterContext();
+
+  // Restore saved filters when navigating here without URL params
+  useEffect(() => {
+    if (!searchParams.get('year') && savedDashboard) {
+      const params = new URLSearchParams();
+      params.set('year', savedDashboard.year);
+      params.set('month', savedDashboard.month);
+      if (savedDashboard.dept) params.set('dept', savedDashboard.dept);
+      if (savedDashboard.supervisor) params.set('supervisor', savedDashboard.supervisor);
+      if (savedDashboard.manager) params.set('manager', savedDashboard.manager);
+      router.replace(`${pathname}?${params.toString()}`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const pushAndSave = useCallback((params: URLSearchParams) => {
+    router.push(`${pathname}?${params.toString()}`);
+    setDashboard({
+      year: params.get('year') || String(year),
+      month: params.get('month') || String(month),
+      dept: params.get('dept') || '',
+      supervisor: params.get('supervisor') || '',
+      manager: params.get('manager') || '',
+    });
+  }, [router, pathname, year, month, setDashboard]);
 
   // Cascade: when a dept is selected, narrow supervisors and managers to those
   // who appear in at least one employee row in that department.
@@ -76,9 +103,9 @@ export function FilterBar({
       const params = new URLSearchParams(searchParams.toString());
       if (value) params.set(key, value);
       else params.delete(key);
-      router.push(`${pathname}?${params.toString()}`);
+      pushAndSave(params);
     },
-    [router, pathname, searchParams],
+    [searchParams, pushAndSave],
   );
 
   const handleDeptChange = useCallback(
@@ -99,23 +126,23 @@ export function FilterBar({
         if (selectedManager && !validManagers.has(selectedManager)) params.delete('manager');
       }
 
-      router.push(`${pathname}?${params.toString()}`);
+      pushAndSave(params);
     },
-    [router, pathname, searchParams, combinations, selectedSupervisor, selectedManager],
+    [searchParams, combinations, selectedSupervisor, selectedManager, pushAndSave],
   );
 
   const handleYearChange = (value: string) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set('year', value);
     params.set('month', String(month));
-    router.push(`${pathname}?${params.toString()}`);
+    pushAndSave(params);
   };
 
   const handleMonthChange = (value: string) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set('year', String(year));
     params.set('month', value);
-    router.push(`${pathname}?${params.toString()}`);
+    pushAndSave(params);
   };
 
   const currentYear = new Date().getFullYear();
