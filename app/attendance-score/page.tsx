@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import { ScoreFilterBar } from '@/components/attendance-score/ScoreFilterBar';
-import { ScoreTable } from '@/components/attendance-score/ScoreTable';
+import { ScoreBoard } from '@/components/attendance-score/ScoreBoard';
 import { getFilterOptions } from '@/lib/queries/employees';
 import { getAttendanceScores, getLatestAttendanceRange } from '@/lib/queries/attendance-score';
 import { hasAttendanceData } from '@/lib/queries/attendance';
@@ -69,7 +69,6 @@ export default async function AttendanceScorePage({ searchParams }: PageProps) {
         <ScoreFilterBar
           start={start}
           end={end}
-          latestRange={latestRange}
           departments={filterOptions.departments}
           supervisors={filterOptions.supervisors}
           managers={filterOptions.managers}
@@ -81,7 +80,7 @@ export default async function AttendanceScorePage({ searchParams }: PageProps) {
       </Suspense>
       <div className="flex-1 min-h-0 flex flex-col p-6 gap-5">
         {hasRange && scores.length > 0 ? (
-          <ScoreTable
+          <ScoreBoard
             data={scores}
             start={start}
             end={end}

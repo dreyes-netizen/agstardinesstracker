@@ -14,7 +14,6 @@ interface Combination {
 interface ScoreFilterBarProps {
   start: string;
   end: string;
-  latestRange: { start: string; end: string } | null;
   departments: string[];
   supervisors: string[];
   managers: string[];
@@ -27,15 +26,42 @@ interface ScoreFilterBarProps {
 const SELECT_CLS =
   'bg-ground border border-border rounded-[5px] px-2.5 py-1.5 text-[12.5px] text-app-text focus:outline-none min-w-0';
 const LABEL_CLS = 'text-[12.5px] text-muted';
-const PRESET_CLS =
-  'px-2.5 py-1.5 rounded-[5px] border border-border text-[11.5px] text-muted hover:text-app-text hover:border-app-text/30 transition-colors';
+
+const MONTHS = [
+  { value: '1', label: 'January' },
+  { value: '2', label: 'February' },
+  { value: '3', label: 'March' },
+  { value: '4', label: 'April' },
+  { value: '5', label: 'May' },
+  { value: '6', label: 'June' },
+  { value: '7', label: 'July' },
+  { value: '8', label: 'August' },
+  { value: '9', label: 'September' },
+  { value: '10', label: 'October' },
+  { value: '11', label: 'November' },
+  { value: '12', label: 'December' },
+];
 
 function iso(d: Date): string {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().split('T')[0];
 }
 
+// Only report a month/year selection when the range is exactly that
+// calendar month's full span — a manually-edited partial range should
+// show the dropdowns as blank rather than a stale/misleading month.
+function monthYearFromRange(start: string, end: string): { month: string; year: string } | null {
+  if (!start || !end) return null;
+  const s = new Date(`${start}T00:00:00`);
+  const firstOfMonth = iso(new Date(s.getFullYear(), s.getMonth(), 1));
+  const lastOfMonth = iso(new Date(s.getFullYear(), s.getMonth() + 1, 0));
+  if (firstOfMonth === start && lastOfMonth === end) {
+    return { month: String(s.getMonth() + 1), year: String(s.getFullYear()) };
+  }
+  return null;
+}
+
 export function ScoreFilterBar({
-  start, end, latestRange,
+  start, end,
   departments, supervisors, managers, combinations,
   selectedDept, selectedSupervisor, selectedManager,
 }: ScoreFilterBarProps) {
@@ -113,15 +139,45 @@ export function ScoreFilterBar({
     [pushParams, combinations, selectedSupervisor, selectedManager],
   );
 
-  const thisMonth = () => {
-    const now = new Date();
-    setRange(iso(new Date(now.getFullYear(), now.getMonth(), 1)), iso(new Date(now.getFullYear(), now.getMonth() + 1, 0)));
+  const [selMonth, setSelMonth] = useState('');
+  const [selYear, setSelYear] = useState('');
+
+  // Date pickers are the source of truth: only reflect a month/year
+  // selection when the range matches a full calendar month, and reset to
+  // blank the moment a manual edit breaks that match.
+  useEffect(() => {
+    const derived = monthYearFromRange(start, end);
+    setSelMonth(derived?.month ?? '');
+    setSelYear(derived?.year ?? '');
+  }, [start, end]);
+
+  const applyMonthYear = useCallback(
+    (month: string, year: string) => {
+      if (!month || !year) return;
+      const y = Number(year);
+      const m = Number(month);
+      setRange(iso(new Date(y, m - 1, 1)), iso(new Date(y, m, 0)));
+    },
+    [setRange],
+  );
+
+  const now = new Date();
+  const handleMonthChange = (value: string) => {
+    const year = selYear || String(now.getFullYear());
+    setSelMonth(value);
+    setSelYear(year);
+    applyMonthYear(value, year);
   };
-  const last30 = () => {
-    const now = new Date();
-    const from = new Date(now); from.setDate(now.getDate() - 29);
-    setRange(iso(from), iso(now));
+  const handleYearChange = (value: string) => {
+    const month = selMonth || String(now.getMonth() + 1);
+    setSelMonth(month);
+    setSelYear(value);
+    applyMonthYear(month, value);
   };
+
+  const currentYear = now.getFullYear();
+  const years: number[] = [];
+  for (let y = currentYear + 1; y >= 2024; y--) years.push(y);
 
   return (
     <div className="bg-white border-b border-border px-6 py-3 flex items-center gap-4 flex-wrap">
@@ -141,14 +197,20 @@ export function ScoreFilterBar({
           onChange={(e) => updateParam('end', e.target.value)} className={SELECT_CLS} />
       </div>
 
-      <div className="flex items-center gap-1.5">
-        {latestRange && (
-          <button className={PRESET_CLS} onClick={() => setRange(latestRange.start, latestRange.end)}>
-            Latest period
-          </button>
-        )}
-        <button className={PRESET_CLS} onClick={thisMonth}>This month</button>
-        <button className={PRESET_CLS} onClick={last30}>Last 30 days</button>
+      <div className="flex items-center gap-2">
+        <span className={LABEL_CLS}>Month</span>
+        <select value={selMonth} onChange={(e) => handleMonthChange(e.target.value)} className={SELECT_CLS}>
+          <option value="">Month</option>
+          {MONTHS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+        </select>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <span className={LABEL_CLS}>Year</span>
+        <select value={selYear} onChange={(e) => handleYearChange(e.target.value)} className={SELECT_CLS}>
+          <option value="">Year</option>
+          {years.map((y) => <option key={y} value={y}>{y}</option>)}
+        </select>
       </div>
 
       <button
