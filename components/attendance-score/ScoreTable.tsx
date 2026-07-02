@@ -106,6 +106,7 @@ const columns = [
 
 interface ScoreTableProps {
   data: AttendanceScore[];
+  gradeFilter?: number | null;
   start: string;
   end: string;
   dept?: string;
@@ -118,7 +119,7 @@ function escCsv(v: string | number | null | undefined): string {
   return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
-export function ScoreTable({ data, start, end, dept, supervisor, manager }: ScoreTableProps) {
+export function ScoreTable({ data, gradeFilter, start, end, dept, supervisor, manager }: ScoreTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 50 });
   const [search, setSearch] = useState('');
@@ -126,9 +127,12 @@ export function ScoreTable({ data, start, end, dept, supervisor, manager }: Scor
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return data;
-    return data.filter((e) => e.fullName.toLowerCase().includes(q) || e.employeeId.toLowerCase().includes(q));
-  }, [data, search]);
+    return data.filter((e) => {
+      if (gradeFilter != null && e.attendanceGrade !== gradeFilter) return false;
+      if (!q) return true;
+      return e.fullName.toLowerCase().includes(q) || e.employeeId.toLowerCase().includes(q);
+    });
+  }, [data, search, gradeFilter]);
 
   function exportCsv() {
     const rows: string[][] = [
