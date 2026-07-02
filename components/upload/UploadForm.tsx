@@ -63,7 +63,7 @@ export function UploadForm() {
           className="block w-full text-[13px] text-app-text file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-[12px] file:font-semibold file:bg-navy file:text-white hover:file:bg-navy/90 cursor-pointer"
         />
         <p className="text-[11.5px] text-muted">
-          Replaces the employee list. Agents not in the file will be removed along with their records. File from Sprout: <span className="font-medium text-app-text">Employee List Report</span>.
+          Replaces the employee list. Agents not in the file will be removed along with their records. File from Sprout: <span className="font-medium text-app-text">Employee List Report</span>. Employees missing from this file will have their schedule skipped when a new attendance report is uploaded — keep the roster up to date before uploading a new attendance report.
         </p>
         <div className="mt-2">
           <p className="text-[11px] font-semibold text-muted uppercase tracking-[0.06em] mb-1.5">Required columns</p>
@@ -115,7 +115,7 @@ export function UploadForm() {
           className="block w-full text-[13px] text-app-text file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-[12px] file:font-semibold file:bg-navy file:text-white hover:file:bg-navy/90 cursor-pointer"
         />
         <p className="text-[11.5px] text-muted">
-          Feeds the Attendance Score (approved sick leave) and the Leave Report view. File from Sprout: <span className="font-medium text-app-text">Leave Report</span> (LEAVE TRANSACTIONS REPORT sheet). Re-uploading overlapping weeks is safe — duplicates are merged.
+          Feeds the Attendance Score (approved sick leave) and the Leave Report view. File from Sprout: <span className="font-medium text-app-text">Leave Report</span> (LEAVE TRANSACTIONS REPORT sheet). Re-uploading overlapping weeks is safe — duplicates are merged. Please include the previous cutoff as well even if it already has a record, to catch leave that was filed late.
         </p>
       </div>
 
