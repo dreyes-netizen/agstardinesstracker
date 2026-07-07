@@ -33,13 +33,14 @@ export default async function AttendanceScorePage({ searchParams }: PageProps) {
     hasAttendanceData(curYear, curMonth),
   ]);
 
-  // Default: month-to-date (1st → today) when the current month has data,
-  // otherwise show the whole month of the most recent uploaded period.
+  // Default: month-to-date (1st → latest uploaded date) when the current month
+  // has data, otherwise show the whole month of the most recent uploaded period.
+  // Capped at latestRange.end so the picker never runs ahead of the actual data.
   let defaultStart = '';
   let defaultEnd = '';
   if (hasThisMonth) {
     defaultStart = `${todayPH.slice(0, 7)}-01`;
-    defaultEnd = todayPH;
+    defaultEnd = latestRange && latestRange.end < todayPH ? latestRange.end : todayPH;
   } else if (latestRange) {
     defaultStart = `${latestRange.end.slice(0, 7)}-01`;
     defaultEnd = latestRange.end;
