@@ -2,6 +2,7 @@ import { db } from '@/lib/db';
 import { leaveRecords, employees } from '@/lib/db/schema';
 import { and, asc, eq, gte, lte, sql } from 'drizzle-orm';
 import { getRosterEmployeeIds } from './employees';
+import { notExcludedSql } from './exclusions';
 import type { ParsedLeaveRecord } from '@/lib/parsers/leave';
 
 // Upsert leave transactions. Re-uploading overlapping weekly reports is safe:
@@ -93,6 +94,8 @@ export async function getApprovedLeaves(
         eq(leaveRecords.status, 'Approved'),
         lte(leaveRecords.dateFrom, end),
         gte(leaveRecords.dateTo, start),
+        // Hide excluded employees / departments, consistent with the other views.
+        notExcludedSql('employees'),
       ),
     )
     .orderBy(asc(leaveRecords.dateFrom), asc(leaveRecords.employeeId));
