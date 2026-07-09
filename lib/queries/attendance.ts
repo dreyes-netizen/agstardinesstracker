@@ -2,6 +2,7 @@ import { db } from '@/lib/db';
 import { attendanceRecords, employees, nteRecords, uploadHistory } from '@/lib/db/schema';
 import { and, eq, sql } from 'drizzle-orm';
 import { computeNteStatus, NteStatus } from '@/lib/utils/nte-status';
+import { notExcludedSql } from '@/lib/queries/exclusions';
 
 export interface EmployeeMonthlyStats {
   employeeId: string;
@@ -63,6 +64,7 @@ export async function getMonthlyStats(filters: DashboardFilters): Promise<Employ
       (${filters.department ?? null}::text IS NULL OR e.department = ${filters.department ?? null}::text)
       AND (${filters.immediateSupervisor ?? null}::text IS NULL OR e.immediate_supervisor = ${filters.immediateSupervisor ?? null}::text)
       AND (${filters.approver2 ?? null}::text IS NULL OR e.approver2 = ${filters.approver2 ?? null}::text)
+      AND ${notExcludedSql('e')}
     GROUP BY e.employee_id, e.first_name, e.last_name, e.middle_name,
              e.department, e.immediate_supervisor, e.approver2,
              n.id, n.status, n.issued_date, n.issued_by, n.acknowledged_date
@@ -105,27 +107,27 @@ export interface DayOfWeekStat {
 }
 
 export async function getLateByDayOfWeek(filters: DashboardFilters): Promise<DayOfWeekStat[]> {
-  const needsJoin = !!(filters.department || filters.immediateSupervisor || filters.approver2);
   const monthStr = `${filters.year}-${String(filters.month).padStart(2, '0')}`;
   const monthStart = `${monthStr}-01`;
   const nextY = filters.month === 12 ? filters.year + 1 : filters.year;
   const nextM = filters.month === 12 ? 1 : filters.month + 1;
   const periodEnd = `${nextY}-${String(nextM).padStart(2, '0')}-01`;
 
+  // Always join employees so excluded people are filtered out of the chart, even
+  // when no department/supervisor/manager filter is active.
   const rows = await db.execute(sql`
     SELECT
       EXTRACT(DOW FROM a.date::date)::int AS dow,
       COUNT(DISTINCT a.employee_id)::int  AS late_employees
     FROM attendance_records a
-    ${needsJoin ? sql`
-      JOIN employees e ON a.employee_id = e.employee_id` : sql``}
+    JOIN employees e ON a.employee_id = e.employee_id
     WHERE a.late_minutes > 0
       AND a.date >= ${monthStart}::date
       AND a.date < ${periodEnd}::date
-      ${needsJoin ? sql`
       AND (${filters.department          ?? null}::text IS NULL OR e.department           = ${filters.department          ?? null}::text)
       AND (${filters.immediateSupervisor ?? null}::text IS NULL OR e.immediate_supervisor = ${filters.immediateSupervisor ?? null}::text)
-      AND (${filters.approver2           ?? null}::text IS NULL OR e.approver2            = ${filters.approver2           ?? null}::text)` : sql``}
+      AND (${filters.approver2           ?? null}::text IS NULL OR e.approver2            = ${filters.approver2           ?? null}::text)
+      AND ${notExcludedSql('e')}
     GROUP BY dow
     ORDER BY dow
   `);
@@ -198,6 +200,50 @@ export async function getEmployeeLateRecords(employeeId: string, year: number, m
       ),
     )
     .orderBy(attendanceRecords.date);
+}
+
+export interface TardinessIncident {
+  date: string;
+  lateMinutes: number;
+  undertimeMinutes: number;
+  shiftSchedule: string | null;
+  actualLogs: string | null;
+}
+
+// Per-employee late incidents over an arbitrary date range (inclusive), late days
+// only. Range-based counterpart to getEmployeeLateRecords (which is single-month);
+// includes the scheduled shift + actual clock-in log for the detailed report.
+export async function getEmployeeTardinessDetail(
+  employeeId: string,
+  start: string,
+  end: string,
+): Promise<TardinessIncident[]> {
+  const rows = await db
+    .select({
+      date: attendanceRecords.date,
+      lateMinutes: attendanceRecords.lateMinutes,
+      undertimeMinutes: attendanceRecords.undertimeMinutes,
+      shiftSchedule: attendanceRecords.shiftSchedule,
+      actualLogs: attendanceRecords.actualLogs,
+    })
+    .from(attendanceRecords)
+    .where(
+      and(
+        eq(attendanceRecords.employeeId, employeeId),
+        sql`${attendanceRecords.date} >= ${start}::date`,
+        sql`${attendanceRecords.date} <= ${end}::date`,
+        sql`${attendanceRecords.lateMinutes} > 0`,
+      ),
+    )
+    .orderBy(attendanceRecords.date);
+
+  return rows.map((r) => ({
+    date: String(r.date),
+    lateMinutes: Number(r.lateMinutes) || 0,
+    undertimeMinutes: Number(r.undertimeMinutes) || 0,
+    shiftSchedule: r.shiftSchedule ?? null,
+    actualLogs: r.actualLogs ?? null,
+  }));
 }
 
 export async function replaceAttendancePeriod(

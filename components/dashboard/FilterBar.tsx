@@ -40,7 +40,7 @@ const MONTHS = [
 ];
 
 const SELECT_CLS =
-  'bg-ground border border-border rounded-[5px] px-2.5 py-1.5 text-[12.5px] text-app-text focus:outline-none min-w-0';
+  'bg-ground border border-border rounded-[5px] px-2.5 py-1.5 text-[12.5px] text-app-text focus:outline-none focus-visible:ring-2 focus-visible:ring-app-blue/40 min-w-0';
 const LABEL_CLS =
   'text-[12.5px] text-muted';
 

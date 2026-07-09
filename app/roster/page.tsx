@@ -27,7 +27,7 @@ export default async function RosterPage() {
             </span>
           )}
         </div>
-        <p className="text-[12px] text-muted mt-0.5">All employees imported from the Sprout roster. Update by uploading a new roster file.</p>
+        <p className="text-[12px] text-muted mt-0.5">All employees imported from the Sprout roster. Update by uploading a new roster file. Some employees or departments may be hidden from the Tardiness Tracker, Attendance Score, and NTE views — manage exclusions on the Import reports page.</p>
       </div>
       <div className="flex-1 min-h-0 flex flex-col p-6">
         <RosterTable employees={employees} />

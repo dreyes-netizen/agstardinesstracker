@@ -126,7 +126,7 @@ export function RosterTable({ employees }: { employees: Employee[] }) {
           </thead>
           <tbody>
             {paginated.map((emp, i) => (
-              <tr key={emp.employeeId} className={`border-b border-[#EEF1F4] ${i % 2 === 1 ? 'bg-[#F6F8FA]' : ''}`}>
+              <tr key={emp.employeeId} className={`border-b border-row-border ${i % 2 === 1 ? 'bg-row-alt' : ''}`}>
                 <td className="px-4 py-2.5 first:pl-5 font-mono text-[12px] hidden md:table-cell">{emp.employeeId}</td>
                 <td className="px-4 py-2.5 font-medium text-[13px] whitespace-nowrap">
                   {emp.lastName}, {emp.firstName}{emp.middleName ? ` ${emp.middleName.charAt(0)}.` : ''}

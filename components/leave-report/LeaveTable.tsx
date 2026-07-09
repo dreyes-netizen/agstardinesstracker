@@ -208,6 +208,7 @@ export function LeaveTable({ data, start, end }: LeaveTableProps) {
           </svg>
           <input
             type="search"
+            aria-label="Search leaves by name, ID, or leave type"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name, ID, or leave type…"
@@ -236,16 +237,22 @@ export function LeaveTable({ data, start, end }: LeaveTableProps) {
           <thead className="sticky top-0 z-10 bg-ground">
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id} className="border-b border-border">
-                {hg.headers.map((header) => (
+                {hg.headers.map((header) => {
+                  const sorted = header.column.getIsSorted();
+                  return (
                   <th
                     key={header.id}
                     onClick={header.column.getToggleSortingHandler()}
-                    className={`px-3.5 py-2.5 text-left font-mono text-[10px] tracking-[0.09em] uppercase text-muted cursor-pointer hover:text-app-text select-none first:pl-5 last:pr-5${(header.column.columnDef as any).meta?.hideMobile ? ' hidden md:table-cell' : ''}`}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); header.column.getToggleSortingHandler()?.(e); } }}
+                    tabIndex={0}
+                    aria-sort={sorted === 'asc' ? 'ascending' : sorted === 'desc' ? 'descending' : 'none'}
+                    className={`px-3.5 py-2.5 text-left font-mono text-[10px] tracking-[0.09em] uppercase text-muted cursor-pointer hover:text-app-text select-none first:pl-5 last:pr-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-blue focus-visible:ring-inset${(header.column.columnDef as any).meta?.hideMobile ? ' hidden md:table-cell' : ''}`}
                   >
                     {flexRender(header.column.columnDef.header, header.getContext())}
                     {{ asc: ' ↑', desc: ' ↓' }[header.column.getIsSorted() as string] ?? ''}
                   </th>
-                ))}
+                  );
+                })}
               </tr>
             ))}
           </thead>
@@ -259,6 +266,13 @@ export function LeaveTable({ data, start, end }: LeaveTableProps) {
                 ))}
               </tr>
             ))}
+            {table.getRowModel().rows.length === 0 && (
+              <tr>
+                <td colSpan={table.getVisibleFlatColumns().length} className="text-center py-12 text-muted text-[13px]">
+                  No leaves match your search.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

@@ -106,7 +106,7 @@ export function AuditTable({ data }: { data: AuditEntry[] }) {
         e.employeeId.toLowerCase().includes(q));
     }
     return result;
-  }, [data, search, actionFilter]);
+  }, [data, search, actionFilter, monthFilter]);
 
   function exportCsv() {
     const rows: string[][] = [
@@ -139,6 +139,7 @@ export function AuditTable({ data }: { data: AuditEntry[] }) {
         <span className="text-[13.5px] font-semibold text-app-text flex-shrink-0">Activity</span>
         <input
           type="search"
+          aria-label="Search audit log by actor or employee"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search actor or employee…"
@@ -147,7 +148,7 @@ export function AuditTable({ data }: { data: AuditEntry[] }) {
         <select
           value={monthFilter}
           onChange={(e) => setMonthFilter(e.target.value)}
-          className="flex-shrink-0 bg-ground border border-border rounded-[5px] px-2.5 py-1.5 text-[12.5px] text-app-text focus:outline-none"
+          className="flex-shrink-0 bg-ground border border-border rounded-[5px] px-2.5 py-1.5 text-[12.5px] text-app-text focus:outline-none focus-visible:ring-2 focus-visible:ring-app-blue/40"
         >
           <option value="">All months</option>
           {months.map((m) => (
@@ -157,7 +158,7 @@ export function AuditTable({ data }: { data: AuditEntry[] }) {
         <select
           value={actionFilter}
           onChange={(e) => setActionFilter(e.target.value)}
-          className="flex-shrink-0 bg-ground border border-border rounded-[5px] px-2.5 py-1.5 text-[12.5px] text-app-text focus:outline-none"
+          className="flex-shrink-0 bg-ground border border-border rounded-[5px] px-2.5 py-1.5 text-[12.5px] text-app-text focus:outline-none focus-visible:ring-2 focus-visible:ring-app-blue/40"
         >
           <option value="">All actions</option>
           <option value="issued">Issued</option>
@@ -169,6 +170,9 @@ export function AuditTable({ data }: { data: AuditEntry[] }) {
           disabled={filtered.length === 0}
           className="flex-shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-[5px] border border-border text-[11.5px] text-muted hover:text-app-text hover:border-app-text/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
           Export CSV
         </button>
       </div>
@@ -177,16 +181,22 @@ export function AuditTable({ data }: { data: AuditEntry[] }) {
           <thead className="sticky top-0 z-10 bg-ground">
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id} className="border-b border-border">
-                {hg.headers.map((header) => (
+                {hg.headers.map((header) => {
+                  const sorted = header.column.getIsSorted();
+                  return (
                   <th
                     key={header.id}
                     onClick={header.column.getToggleSortingHandler()}
-                    className="px-3.5 py-2.5 text-left font-mono text-[10px] tracking-[0.09em] uppercase text-muted cursor-pointer hover:text-app-text select-none first:pl-5 last:pr-5"
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); header.column.getToggleSortingHandler()?.(e); } }}
+                    tabIndex={0}
+                    aria-sort={sorted === 'asc' ? 'ascending' : sorted === 'desc' ? 'descending' : 'none'}
+                    className="px-3.5 py-2.5 text-left font-mono text-[10px] tracking-[0.09em] uppercase text-muted cursor-pointer hover:text-app-text select-none first:pl-5 last:pr-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-blue focus-visible:ring-inset"
                   >
                     {flexRender(header.column.columnDef.header, header.getContext())}
                     {{ asc: ' ↑', desc: ' ↓' }[header.column.getIsSorted() as string] ?? ''}
                   </th>
-                ))}
+                  );
+                })}
               </tr>
             ))}
           </thead>
@@ -200,6 +210,13 @@ export function AuditTable({ data }: { data: AuditEntry[] }) {
                 ))}
               </tr>
             ))}
+            {table.getRowModel().rows.length === 0 && (
+              <tr>
+                <td colSpan={table.getVisibleFlatColumns().length} className="text-center py-12 text-muted text-[13px]">
+                  {data.length === 0 ? 'No audit activity yet.' : 'No entries match your search or filters.'}
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

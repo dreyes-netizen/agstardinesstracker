@@ -67,7 +67,7 @@ export function LoginForm() {
       </button>
 
       {error && (
-        <p className="text-[12.5px] text-nte-red bg-nte-red/10 rounded-[5px] px-3 py-2">
+        <p role="alert" className="text-[12.5px] text-nte-red bg-nte-red/10 rounded-[5px] px-3 py-2">
           {error}
         </p>
       )}

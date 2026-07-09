@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { nteRecords, attendanceRecords, employees } from '@/lib/db/schema';
 import { and, eq, sql, SQL } from 'drizzle-orm';
+import { notExcludedSql, employeeNotExcludedSql } from '@/lib/queries/exclusions';
 
 export async function upsertNteRequired(employeeId: string, month: string) {
   await db
@@ -20,6 +21,7 @@ export async function syncNteForMonth(month: string) {
       'required'  AS status
     FROM attendance_records
     WHERE TO_CHAR(date::date, 'YYYY-MM') = ${month}
+      AND ${employeeNotExcludedSql('employee_id')}
     GROUP BY employee_id
     HAVING COUNT(CASE WHEN late_minutes > 0 THEN 1 END) >= 6
         OR COALESCE(SUM(late_minutes), 0) >= 60
@@ -36,6 +38,7 @@ export async function syncAllNteRequired() {
       TO_CHAR(date::date, 'YYYY-MM') AS month,
       'required'                      AS status
     FROM attendance_records
+    WHERE ${employeeNotExcludedSql('employee_id')}
     GROUP BY employee_id, TO_CHAR(date::date, 'YYYY-MM')
     HAVING COUNT(CASE WHEN late_minutes > 0 THEN 1 END) >= 6
         OR COALESCE(SUM(late_minutes), 0) >= 60
@@ -108,6 +111,9 @@ export async function getNteList(filters: NteListFilters = {}) {
     conditions.push(sql`e.department = ${filters.department}`);
   }
 
+  // Hide excluded employees/departments from the NTE list.
+  conditions.push(notExcludedSql('e'));
+
   const whereClause = sql`WHERE ${sql.join(conditions, sql` AND `)}`;
 
   const rows = await db.execute(sql`
@@ -147,12 +153,10 @@ export async function getNteCounts(filters: { month?: string; department?: strin
   if (filters.month) conditions.push(sql`n.month = ${filters.month}`);
   if (filters.department) conditions.push(sql`e.department = ${filters.department}`);
 
-  const join = filters.department
-    ? sql`JOIN employees e ON n.employee_id = e.employee_id`
-    : sql``;
-  const where = conditions.length > 0
-    ? sql`WHERE ${sql.join(conditions, sql` AND `)}`
-    : sql``;
+  // Always join employees so excluded employees/departments are left out of the counts.
+  conditions.push(notExcludedSql('e'));
+  const join = sql`JOIN employees e ON n.employee_id = e.employee_id`;
+  const where = sql`WHERE ${sql.join(conditions, sql` AND `)}`;
 
   const result = await db.execute(sql`
     SELECT n.status, COUNT(*)::int AS count
@@ -182,8 +186,9 @@ export async function getNteFilterOptions() {
     `),
     db.execute(sql`
       SELECT DISTINCT department
-      FROM employees
+      FROM employees e
       WHERE department IS NOT NULL
+        AND ${notExcludedSql('e')}
       ORDER BY department ASC
     `),
   ]);

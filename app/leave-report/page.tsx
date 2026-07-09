@@ -29,7 +29,9 @@ export default async function LeaveReportPage({ searchParams }: PageProps) {
   let defaultEnd = '';
   if (hasThisMonth) {
     defaultStart = `${todayPH.slice(0, 7)}-01`;
-    defaultEnd = todayPH;
+    // Cap the end at the latest uploaded date so the default range never runs
+    // ahead of the data we actually have (matches the Attendance Score page).
+    defaultEnd = latestRange && latestRange.end < todayPH ? latestRange.end : todayPH;
   } else if (latestRange) {
     defaultStart = `${latestRange.end.slice(0, 7)}-01`;
     defaultEnd = latestRange.end;

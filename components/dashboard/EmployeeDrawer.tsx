@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { EmployeeMonthlyStats } from '@/lib/queries/attendance';
 import { NteForm } from './NteForm';
 import { formatDate } from '@/lib/utils/date';
@@ -56,7 +56,8 @@ export function EmployeeDrawer({ employee, year, month, onClose, onNteAction }: 
 
   return (
     <Sheet open={!!employee} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <SheetContent side="right" className="w-[400px] p-0 flex flex-col overflow-hidden bg-white">
+      <SheetContent side="right" className="w-full sm:w-[400px] p-0 flex flex-col overflow-hidden bg-white">
+        <SheetTitle className="sr-only">{fullName} — tardiness detail</SheetTitle>
         <div className="bg-navy px-[22px] py-5 flex-shrink-0">
           <p className="font-mono text-[11px] tracking-[0.12em] text-white/70 mb-1">
             ID #{employee.employeeId} · {employee.department ?? 'No dept'}
@@ -116,7 +117,7 @@ export function EmployeeDrawer({ employee, year, month, onClose, onNteAction }: 
                 </thead>
                 <tbody>
                   {lateRecords.map((r) => (
-                    <tr key={r.date} className="border-b border-[#F0F2F5]">
+                    <tr key={r.date} className="border-b border-row-border">
                       <td className="font-mono text-[12px] py-2 whitespace-nowrap">{formatDate(r.date)}</td>
                       <td className="text-[12px] text-muted py-2">{getDay(r.date)}</td>
                       <td className="font-mono text-[13px] font-semibold text-nte-red text-right py-2">

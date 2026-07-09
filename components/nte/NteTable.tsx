@@ -104,6 +104,7 @@ export function NteTable({ rows }: { rows: NteRow[] }) {
             </svg>
             <input
               type="search"
+              aria-label="Search NTE records by name or ID"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by name or ID…"
@@ -185,7 +186,7 @@ export function NteTable({ rows }: { rows: NteRow[] }) {
                   </td>
                 </tr>
                 {issueForm?.employeeId === row.employee_id && issueForm?.month === row.month && (
-                  <tr className="bg-[#FFF8F5] border-b border-nte-red/10">
+                  <tr className="bg-nte-red/5 border-b border-nte-red/10">
                     <td colSpan={8} className="px-5 py-3">
                       <form onSubmit={handleIssue} className="flex items-center gap-3 flex-wrap">
                         <div className="flex items-center gap-2">
@@ -202,8 +203,10 @@ export function NteTable({ rows }: { rows: NteRow[] }) {
                 )}
               </Fragment>
             ))}
-            {rows.length === 0 && (
-              <tr><td colSpan={8} className="text-center py-12 text-muted text-[13px]">No NTE records match the current filters.</td></tr>
+            {filtered.length === 0 && (
+              <tr><td colSpan={8} className="text-center py-12 text-muted text-[13px]">
+                {rows.length === 0 ? 'No NTE records for this period.' : 'No records match your search.'}
+              </td></tr>
             )}
           </tbody>
         </table>

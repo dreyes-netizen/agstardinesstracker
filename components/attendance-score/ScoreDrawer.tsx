@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import type { AttendanceScore, ScoreDetail, ScoreDetailDay } from '@/lib/queries/attendance-score';
 import { formatDate } from '@/lib/utils/date';
 import { h2, pct2, fmtDuration, pctClass, gradeClass } from '@/lib/utils/score-format';
@@ -60,7 +60,8 @@ export function ScoreDrawer({ score, start, end, onClose }: ScoreDrawerProps) {
 
   return (
     <Sheet open={!!score} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <SheetContent side="right" className="w-[440px] p-0 flex flex-col overflow-hidden bg-white">
+      <SheetContent side="right" className="w-full sm:w-[440px] p-0 flex flex-col overflow-hidden bg-white">
+        <SheetTitle className="sr-only">{score.fullName} — attendance score detail</SheetTitle>
         <div className="bg-navy px-[22px] py-5 flex-shrink-0">
           <p className="font-mono text-[11px] tracking-[0.12em] text-white/70 mb-1">
             ID #{score.employeeId} · {score.account ?? 'No account'}
@@ -129,7 +130,7 @@ export function ScoreDrawer({ score, start, end, onClose }: ScoreDrawerProps) {
                     const undertimeMin = d.lateMinutes + d.undertimeMinutes;
                     const s = statusMeta[statusOf(d)];
                     return (
-                      <tr key={d.date} className="border-b border-[#F0F2F5]">
+                      <tr key={d.date} className="border-b border-row-border">
                         <td className="font-mono text-[11.5px] py-1.5">{formatDate(d.date)}</td>
                         <td className="text-[11.5px] text-muted py-1.5">{getDay(d.date)}</td>
                         <td className="py-1.5">

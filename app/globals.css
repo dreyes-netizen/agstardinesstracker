@@ -17,3 +17,15 @@
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-in-up { animation: none; }
 }
+
+/* Print / Save-as-PDF: reduce the page to just the report content. App chrome is
+   hidden via `print:hidden` (sidebar, filter bar, empty state); here we set page
+   margins and force background colors so the navy report header prints. */
+@media print {
+  @page { margin: 12mm; }
+  html, body {
+    background: #fff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

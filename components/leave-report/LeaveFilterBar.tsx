@@ -12,10 +12,10 @@ interface LeaveFilterBarProps {
 }
 
 const FIELD_CLS =
-  'bg-ground border border-border rounded-[5px] px-2.5 py-1.5 text-[12.5px] text-app-text focus:outline-none min-w-0';
+  'bg-ground border border-border rounded-[5px] px-2.5 py-1.5 text-[12.5px] text-app-text focus:outline-none focus-visible:ring-2 focus-visible:ring-app-blue/40 min-w-0';
 const LABEL_CLS = 'text-[12.5px] text-muted';
 const PRESET_CLS =
-  'px-2.5 py-1.5 rounded-[5px] border border-border text-[11.5px] text-muted hover:text-app-text hover:border-app-text/30 transition-colors';
+  'px-2.5 py-1.5 rounded-[5px] border border-border text-[11.5px] text-muted hover:text-app-text hover:border-app-text/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-blue/40 transition-colors';
 
 function iso(d: Date): string {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().split('T')[0];

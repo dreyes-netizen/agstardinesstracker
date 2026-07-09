@@ -41,9 +41,23 @@ export const employees = pgTable('employees', {
   immediateSupervisor: text('immediate_supervisor'),
   approver2: text('approver2'),
   hireDate: date('hire_date'),
+  // Soft exclusion: when true, this employee is hidden from the Tardiness Tracker,
+  // Attendance Score, and NTE views (data is kept, not deleted). Preserved across
+  // roster re-uploads — upsertEmployees deliberately never overwrites this flag.
+  excludedFromTracking: boolean('excluded_from_tracking').notNull().default(false),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
+
+// Department-level soft exclusion. Every employee whose department name matches a row
+// here (case-insensitive, trimmed) is hidden from tracking views — the whole-group
+// counterpart to employees.excluded_from_tracking. Seeded with "Do Not Delete".
+export const excludedDepartments = pgTable('excluded_departments', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),            // stored trimmed; matched case-insensitively
+  createdBy: text('created_by'),           // actor email
+  createdAt: timestamp('created_at').defaultNow(),
+}, (t) => ({ nameUniq: uniqueIndex('excluded_dept_name_idx').on(t.name) }));
 
 export const attendanceRecords = pgTable('attendance_records', {
   id: serial('id').primaryKey(),
@@ -118,4 +132,5 @@ export type NteRecord = typeof nteRecords.$inferSelect;
 export type LeaveRecord = typeof leaveRecords.$inferSelect;
 export type AppUser = typeof appUsers.$inferSelect;
 export type NteAuditEntry = typeof nteAuditLog.$inferSelect;
+export type ExcludedDepartment = typeof excludedDepartments.$inferSelect;
 export type Role = 'admin' | 'manager';

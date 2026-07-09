@@ -1,6 +1,7 @@
 import { db } from '@/lib/db';
 import { employees, attendanceRecords, nteRecords, leaveRecords } from '@/lib/db/schema';
 import { asc, notInArray, sql } from 'drizzle-orm';
+import { notExcludedSql } from '@/lib/queries/exclusions';
 
 export async function getLastRosterUpdate(): Promise<string | null> {
   const result = await db.execute(
@@ -59,6 +60,9 @@ export async function getFilterOptions() {
       approver2: employees.approver2,
     })
     .from(employees)
+    // Excluded employees/departments shouldn't appear as filter choices in the
+    // Dashboard / Attendance Score filter bars.
+    .where(notExcludedSql('employees'))
     .orderBy(asc(employees.department));
 
   const departments = Array.from(new Set(rows.map((r) => r.department).filter(Boolean))) as string[];

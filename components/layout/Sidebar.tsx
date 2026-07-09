@@ -11,6 +11,7 @@ import { useFilterContext } from '@/context/FilterContext';
 const navItems: { href: string; label: string; icon: string; adminOnly?: boolean }[] = [
   { href: '/',                 label: 'Dashboard',        icon: '▦' },
   { href: '/attendance-score', label: 'Attendance Score', icon: '◊' },
+  { href: '/tardiness',        label: 'Tardiness Report', icon: '⧗' },
   { href: '/leave-report',     label: 'Leave Report',     icon: '☷' },
   { href: '/nte',              label: 'NTE Management',   icon: '⚑' },
   { href: '/audit',            label: 'Audit Log',        icon: '◷' },
@@ -81,7 +82,7 @@ export function Sidebar({ open, onClose, user }: SidebarProps) {
           w-[220px] bg-navy flex flex-col flex-shrink-0 h-screen
           fixed inset-y-0 left-0 z-50
           transition-transform duration-200 ease-out
-          md:static md:translate-x-0
+          md:static md:translate-x-0 print:hidden
           ${open ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
         `}
       >

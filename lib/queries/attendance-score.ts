@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { sql } from 'drizzle-orm';
+import { notExcludedSql } from '@/lib/queries/exclusions';
 
 export interface AttendanceScore {
   employeeId: string;
@@ -90,6 +91,7 @@ export async function getAttendanceScores(filters: ScoreFilters): Promise<Attend
       (${filters.department ?? null}::text IS NULL OR e.department = ${filters.department ?? null}::text)
       AND (${filters.immediateSupervisor ?? null}::text IS NULL OR e.immediate_supervisor = ${filters.immediateSupervisor ?? null}::text)
       AND (${filters.approver2 ?? null}::text IS NULL OR e.approver2 = ${filters.approver2 ?? null}::text)
+      AND ${notExcludedSql('e')}
     ORDER BY e.last_name, e.first_name
   `);
 

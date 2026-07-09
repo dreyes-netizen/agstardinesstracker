@@ -20,7 +20,7 @@ interface EmployeeOption {
   department: string | null;
 }
 
-const SELECT = 'bg-ground border border-border rounded-[5px] px-2 py-1 text-[12.5px] text-app-text focus:outline-none h-8';
+const SELECT = 'bg-ground border border-border rounded-[5px] px-2 py-1 text-[12.5px] text-app-text focus:outline-none focus-visible:ring-2 focus-visible:ring-app-blue/40 h-8';
 const FIELD = 'block text-[13px] text-app-text bg-ground border border-border rounded-[5px] px-2.5 h-9 focus:outline-none focus:ring-2 focus:ring-app-blue/40 placeholder:text-muted';
 const HEAD = 'px-4 py-2.5 text-left font-mono text-[10px] tracking-[0.09em] uppercase text-muted whitespace-nowrap';
 
@@ -98,9 +98,13 @@ export function UsersManager({
         </td>
         <td className="px-4 py-2.5">
           <button
-            onClick={() => run(() => setActiveAction(u.email, !u.active))}
+            onClick={() => {
+              // Disabling revokes access — confirm first. Re-enabling is harmless.
+              if (u.active && !window.confirm(`Disable ${u.email}? They will lose access to the app until you re-enable them.`)) return;
+              run(() => setActiveAction(u.email, !u.active));
+            }}
             disabled={pending}
-            className={`inline-flex items-center gap-1.5 text-[11.5px] px-2 py-1 rounded-[5px] border transition-colors whitespace-nowrap ${
+            className={`inline-flex items-center gap-1.5 text-[11.5px] px-2 py-1 rounded-[5px] border transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-blue/40 ${
               u.active ? 'border-safe-green/30 text-safe-green bg-safe-green/5' : 'border-border text-muted'
             }`}
           >
@@ -110,9 +114,12 @@ export function UsersManager({
         </td>
         <td className="px-4 py-2.5 text-right">
           <button
-            onClick={() => run(() => removeUserAction(u.email))}
+            onClick={() => {
+              if (!window.confirm(`Remove ${u.email}? They will immediately lose access to the app. This cannot be undone from here.`)) return;
+              run(() => removeUserAction(u.email));
+            }}
             disabled={pending}
-            className="text-[11.5px] text-muted hover:text-nte-red transition-colors disabled:opacity-40"
+            className="text-[11.5px] text-muted hover:text-nte-red transition-colors disabled:opacity-40 rounded-[4px] px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nte-red/40"
           >
             Remove
           </button>

@@ -66,9 +66,9 @@ export default async function NtePage({ searchParams }: PageProps) {
             <p className="font-mono text-[10px] uppercase tracking-[0.09em] text-nte-red/70 mb-1">NTE Required</p>
             <p className="text-2xl font-semibold text-nte-red">{counts.required}</p>
           </div>
-          <div className="bg-white border border-amber-200 rounded-[7px] px-4 py-3">
-            <p className="font-mono text-[10px] uppercase tracking-[0.09em] text-amber-500/80 mb-1">Issued</p>
-            <p className="text-2xl font-semibold text-amber-500">{counts.issued}</p>
+          <div className="bg-white border border-amber/30 rounded-[7px] px-4 py-3">
+            <p className="font-mono text-[10px] uppercase tracking-[0.09em] text-amber-dark/80 mb-1">Issued</p>
+            <p className="text-2xl font-semibold text-amber-dark">{counts.issued}</p>
           </div>
           <div className="bg-white border border-safe-green/20 rounded-[7px] px-4 py-3">
             <p className="font-mono text-[10px] uppercase tracking-[0.09em] text-safe-green/80 mb-1">Acknowledged</p>
