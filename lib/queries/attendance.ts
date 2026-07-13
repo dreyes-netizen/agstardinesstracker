@@ -260,35 +260,54 @@ export async function replaceAttendancePeriod(
     actualLogs: string;
   }[],
 ) {
+  // Nothing to upload — leave existing data untouched rather than wiping a period.
+  if (records.length === 0) return 0;
+
+  // Dedupe by (employee_id, date), last-wins. A malformed export that repeats an
+  // employee block would otherwise collide with itself inside a single insert
+  // batch (the unique index is on employee_id + date).
+  const byKey = new Map<string, (typeof records)[number]>();
+  for (const r of records) byKey.set(`${r.employeeId}|${r.date}`, r);
+  const deduped = Array.from(byKey.values());
+
+  // Clear existing rows by the CALENDAR DATE RANGE this upload covers — NOT by
+  // the report_period_* columns. The unique index is on (employee_id, date), and
+  // the same date can arrive under different report-period boundaries across
+  // overlapping uploads (e.g. a monthly report after a weekly one). A
+  // period-scoped delete would leave a prior row for that date in place and the
+  // insert would fail with a duplicate-key violation. Deleting by date range
+  // makes an upload authoritative for exactly the dates it contains.
+  const dates = deduped.map((r) => r.date).sort();
+  const minDate = dates[0];
+  const maxDate = dates[dates.length - 1];
+
   await db
     .delete(attendanceRecords)
     .where(
       and(
-        eq(attendanceRecords.reportPeriodStart, periodStart),
-        eq(attendanceRecords.reportPeriodEnd, periodEnd),
+        sql`${attendanceRecords.date} >= ${minDate}::date`,
+        sql`${attendanceRecords.date} <= ${maxDate}::date`,
       ),
     );
 
-  if (records.length > 0) {
-    const BATCH = 500;
-    const mapped = records.map((r) => ({
-      employeeId: r.employeeId,
-      date: r.date,
-      lateMinutes: r.lateMinutes,
-      undertimeMinutes: r.undertimeMinutes,
-      totalHoursWorked: String(r.totalHoursWorked ?? 0),
-      shiftType: r.shiftType || null,
-      shiftSchedule: r.shiftSchedule || null,
-      actualLogs: r.actualLogs ? r.actualLogs.slice(0, 500) : null,
-      reportPeriodStart: periodStart,
-      reportPeriodEnd: periodEnd,
-    }));
-    for (let i = 0; i < mapped.length; i += BATCH) {
-      await db.insert(attendanceRecords).values(mapped.slice(i, i + BATCH));
-    }
+  const BATCH = 500;
+  const mapped = deduped.map((r) => ({
+    employeeId: r.employeeId,
+    date: r.date,
+    lateMinutes: r.lateMinutes,
+    undertimeMinutes: r.undertimeMinutes,
+    totalHoursWorked: String(r.totalHoursWorked ?? 0),
+    shiftType: r.shiftType || null,
+    shiftSchedule: r.shiftSchedule || null,
+    actualLogs: r.actualLogs ? r.actualLogs.slice(0, 500) : null,
+    reportPeriodStart: periodStart,
+    reportPeriodEnd: periodEnd,
+  }));
+  for (let i = 0; i < mapped.length; i += BATCH) {
+    await db.insert(attendanceRecords).values(mapped.slice(i, i + BATCH));
   }
 
-  return records.length;
+  return deduped.length;
 }
 
 export async function recordUpload(
