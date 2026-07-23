@@ -48,12 +48,20 @@ export function ScoreDrawer({ score, start, end, onClose }: ScoreDrawerProps) {
 
   // A day inside an approved Sick leave reads as "Sick Leave" even though
   // attendance credits it as worked hours (ISO dates compare lexicographically).
+  // Holiday / On Leave / Unpaid Leave / Not Yet Hired are 0-hour days the
+  // employee wasn't expected to work — they read as such instead of "Absent"
+  // (score math in attendance-score.ts already excludes them from absent/required hours).
   const statusMeta = {
     sick: { label: 'Sick Leave', cls: 'bg-amber/10 text-amber' },
     present: { label: 'Present', cls: 'bg-safe-green/10 text-safe-green' },
     absent: { label: 'Absent', cls: 'bg-nte-red/10 text-nte-red' },
+    holiday: { label: 'Holiday', cls: 'bg-app-blue/10 text-app-blue' },
+    'on-leave': { label: 'On Leave', cls: 'bg-app-blue/10 text-app-blue' },
+    'unpaid-leave': { label: 'Unpaid Leave', cls: 'bg-muted/10 text-muted' },
+    'not-yet-hired': { label: 'Not Yet Hired', cls: 'bg-muted/10 text-muted' },
   } as const;
   function statusOf(d: ScoreDetailDay): keyof typeof statusMeta {
+    if (d.dayType !== 'working') return d.dayType;
     if (detail?.sick.some((lv) => d.date >= lv.dateFrom && d.date <= lv.dateTo)) return 'sick';
     return d.present ? 'present' : 'absent';
   }
