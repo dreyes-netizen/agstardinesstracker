@@ -1,6 +1,22 @@
 import { db } from '@/lib/db';
-import { sql } from 'drizzle-orm';
+import { sql, SQL } from 'drizzle-orm';
 import { notExcludedSql } from '@/lib/queries/exclusions';
+import { NON_WORKING_PATTERNS, classifyDayType, type DayType } from '@/lib/utils/day-type';
+
+// Matches attendance rows whose shift_schedule marks a non-working day
+// (holiday, approved leave, pre-hire) — see lib/utils/day-type.ts.
+const nonWorkingScheduleSql: SQL = sql.join(
+  NON_WORKING_PATTERNS.map((p) => sql`UPPER(COALESCE(a.shift_schedule, '')) LIKE ${'%' + p + '%'}`),
+  sql` OR `,
+);
+
+// A day only needs this fix when Sprout recorded 0 hours for it — that's the
+// actual bug (a holiday/leave/pre-hire day with 0 hours reads as "Absent").
+// If the schedule text says HOLIDAY/ON LEAVE/etc but hours were still
+// credited (e.g. paid leave logged as 8 worked hours), that day was already
+// counting correctly as present and must be left alone, or it would silently
+// shrink required hours for a day that was never wrong.
+const zeroHourNonWorkingSql: SQL = sql`(COALESCE(a.total_hours_worked, 0) = 0 AND (${nonWorkingScheduleSql}))`;
 
 export interface AttendanceScore {
   employeeId: string;
@@ -51,8 +67,8 @@ export async function getAttendanceScores(filters: ScoreFilters): Promise<Attend
       SELECT
         a.employee_id,
         COUNT(*) FILTER (WHERE COALESCE(a.total_hours_worked, 0) > 0)::int AS days_present,
-        COUNT(*) FILTER (WHERE COALESCE(a.total_hours_worked, 0) = 0)::int AS days_absent,
-        COALESCE(SUM(a.late_minutes + a.undertime_minutes), 0)::numeric AS undertime_min
+        COUNT(*) FILTER (WHERE COALESCE(a.total_hours_worked, 0) = 0 AND NOT (${zeroHourNonWorkingSql}))::int AS days_absent,
+        COALESCE(SUM(a.late_minutes + a.undertime_minutes) FILTER (WHERE NOT (${zeroHourNonWorkingSql})), 0)::numeric AS undertime_min
       FROM attendance_records a
       WHERE a.date >= ${start}::date AND a.date <= ${end}::date
       GROUP BY a.employee_id
@@ -133,6 +149,7 @@ export interface ScoreDetailDay {
   lateMinutes: number;
   undertimeMinutes: number;
   present: boolean;
+  dayType: DayType;
 }
 export interface ScoreDetailSick {
   dateFrom: string;
@@ -156,7 +173,8 @@ export async function getEmployeeScoreDetail(
       date::text AS date,
       COALESCE(total_hours_worked, 0)::float8 AS hours_worked,
       COALESCE(late_minutes, 0)::int AS late_minutes,
-      COALESCE(undertime_minutes, 0)::int AS undertime_minutes
+      COALESCE(undertime_minutes, 0)::int AS undertime_minutes,
+      shift_schedule
     FROM attendance_records
     WHERE employee_id = ${employeeId}
       AND date >= ${start}::date AND date <= ${end}::date
@@ -171,6 +189,7 @@ export async function getEmployeeScoreDetail(
       lateMinutes: Number(r.late_minutes) || 0,
       undertimeMinutes: Number(r.undertime_minutes) || 0,
       present: hoursWorked > 0,
+      dayType: classifyDayType(r.shift_schedule as string | null),
     };
   });
 
