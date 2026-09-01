@@ -10,13 +10,41 @@ const nonWorkingScheduleSql: SQL = sql.join(
   sql` OR `,
 );
 
+// Approved Vacation is treated like a normal worked day: it counts toward
+// both present and required hours (unlike Sick, which is subtracted from
+// present hours below). Most vacation days already show up in Sprout with
+// total_hours_worked > 0 and need no help; this only matters for the rare
+// zero-hour day whose shift_schedule text would otherwise exclude it.
+const coveredByVacationSql: SQL = sql`EXISTS (
+  SELECT 1 FROM leave_records lv
+  WHERE lv.employee_id = a.employee_id
+    AND lv.status = 'Approved'
+    AND lv.leave_type = 'Vacation'
+    AND a.date >= lv.date_from AND a.date <= lv.date_to
+)`;
+
+// Sprout's total_hours_worked can read 0 on a day the employee actually
+// clocked in/out for (commonly a HOLIDAY-tagged shift Sprout doesn't count
+// toward "hours worked" for payroll purposes). actual_logs carries the raw
+// clock times, or the literal string "NO LOGS" when nothing was recorded —
+// so a real value there means the employee was genuinely present.
+const hasRealLogsSql: SQL = sql`(a.actual_logs IS NOT NULL AND a.actual_logs <> '' AND UPPER(a.actual_logs) <> 'NO LOGS')`;
+
+// A zero-hour day still counts as present when either an approved Vacation
+// request covers it, or actual_logs shows the employee really clocked in.
+// Both override whatever total_hours_worked / shift_schedule text say.
+const zeroHourPresentOverrideSql: SQL = sql`(COALESCE(a.total_hours_worked, 0) = 0 AND ((${coveredByVacationSql}) OR (${hasRealLogsSql})))`;
+
 // A day only needs this fix when Sprout recorded 0 hours for it — that's the
 // actual bug (a holiday/leave/pre-hire day with 0 hours reads as "Absent").
 // If the schedule text says HOLIDAY/ON LEAVE/etc but hours were still
 // credited (e.g. paid leave logged as 8 worked hours), that day was already
 // counting correctly as present and must be left alone, or it would silently
 // shrink required hours for a day that was never wrong.
-const zeroHourNonWorkingSql: SQL = sql`(COALESCE(a.total_hours_worked, 0) = 0 AND (${nonWorkingScheduleSql}))`;
+// Zero-hour days covered by zeroHourPresentOverrideSql are carved out of this
+// exclusion — they count as present instead, even if Sprout's schedule text
+// also says HOLIDAY/etc for that same date.
+const zeroHourNonWorkingSql: SQL = sql`(COALESCE(a.total_hours_worked, 0) = 0 AND (${nonWorkingScheduleSql}) AND NOT (${zeroHourPresentOverrideSql}))`;
 
 export interface AttendanceScore {
   employeeId: string;
@@ -57,7 +85,10 @@ function gradeFor(pct: number): number {
 //   absent  hours = daysAbsent*8
 //   required      = (daysPresent + daysAbsent)*8
 // total_hours_worked is used only to tell a present day (>0) from an absent
-// day (0). Sick hours are approved "Sick" leaves CLIPPED to the selected range:
+// day (0), except a zero-hour day that's either covered by an approved
+// Vacation request or has real actual_logs (see zeroHourPresentOverrideSql),
+// either of which also counts as present. Sick hours are approved "Sick"
+// leaves CLIPPED to the selected range:
 //   min(withPayDays, overlapping calendar days) * 8.
 export async function getAttendanceScores(filters: ScoreFilters): Promise<AttendanceScore[]> {
   const { start, end } = filters;
@@ -66,9 +97,9 @@ export async function getAttendanceScores(filters: ScoreFilters): Promise<Attend
     WITH att AS (
       SELECT
         a.employee_id,
-        COUNT(*) FILTER (WHERE COALESCE(a.total_hours_worked, 0) > 0)::int AS days_present,
-        COUNT(*) FILTER (WHERE COALESCE(a.total_hours_worked, 0) = 0 AND NOT (${zeroHourNonWorkingSql}))::int AS days_absent,
-        COALESCE(SUM(a.late_minutes + a.undertime_minutes) FILTER (WHERE NOT (${zeroHourNonWorkingSql})), 0)::numeric AS undertime_min
+        COUNT(*) FILTER (WHERE COALESCE(a.total_hours_worked, 0) > 0 OR (${zeroHourPresentOverrideSql}))::int AS days_present,
+        COUNT(*) FILTER (WHERE COALESCE(a.total_hours_worked, 0) = 0 AND NOT (${zeroHourNonWorkingSql}) AND NOT (${zeroHourPresentOverrideSql}))::int AS days_absent,
+        COALESCE(SUM(a.late_minutes + a.undertime_minutes) FILTER (WHERE NOT (${zeroHourNonWorkingSql}) AND NOT (${zeroHourPresentOverrideSql})), 0)::numeric AS undertime_min
       FROM attendance_records a
       WHERE a.date >= ${start}::date AND a.date <= ${end}::date
       GROUP BY a.employee_id
@@ -170,26 +201,43 @@ export async function getEmployeeScoreDetail(
 ): Promise<ScoreDetail> {
   const dailyRes = await db.execute(sql`
     SELECT
-      date::text AS date,
-      COALESCE(total_hours_worked, 0)::float8 AS hours_worked,
-      COALESCE(late_minutes, 0)::int AS late_minutes,
-      COALESCE(undertime_minutes, 0)::int AS undertime_minutes,
-      shift_schedule
-    FROM attendance_records
-    WHERE employee_id = ${employeeId}
-      AND date >= ${start}::date AND date <= ${end}::date
-    ORDER BY date
+      a.date::text AS date,
+      COALESCE(a.total_hours_worked, 0)::float8 AS hours_worked,
+      COALESCE(a.late_minutes, 0)::int AS late_minutes,
+      COALESCE(a.undertime_minutes, 0)::int AS undertime_minutes,
+      a.shift_schedule,
+      EXISTS (
+        SELECT 1 FROM leave_records lv
+        WHERE lv.employee_id = ${employeeId}
+          AND lv.status = 'Approved'
+          AND lv.leave_type = 'Vacation'
+          AND a.date >= lv.date_from AND a.date <= lv.date_to
+      ) AS covered_by_vacation,
+      (a.actual_logs IS NOT NULL AND a.actual_logs <> '' AND UPPER(a.actual_logs) <> 'NO LOGS') AS has_real_logs
+    FROM attendance_records a
+    WHERE a.employee_id = ${employeeId}
+      AND a.date >= ${start}::date AND a.date <= ${end}::date
+    ORDER BY a.date
   `);
 
   const daily: ScoreDetailDay[] = (dailyRes.rows as Record<string, unknown>[]).map((r) => {
     const hoursWorked = Number(r.hours_worked) || 0;
+    // Mirrors zeroHourPresentOverrideSql in getAttendanceScores: a zero-hour
+    // day counts as present when it's covered by approved Vacation, or when
+    // actual_logs shows the employee really clocked in that day.
+    const zeroHourVacation = hoursWorked === 0 && Boolean(r.covered_by_vacation);
+    const zeroHourWorked = hoursWorked === 0 && !zeroHourVacation && Boolean(r.has_real_logs);
+    let dayType: DayType;
+    if (zeroHourVacation) dayType = 'vacation';
+    else if (zeroHourWorked) dayType = 'working'; // falls through to the present/absent/sick check below
+    else dayType = classifyDayType(r.shift_schedule as string | null);
     return {
       date: String(r.date),
       hoursWorked,
       lateMinutes: Number(r.late_minutes) || 0,
       undertimeMinutes: Number(r.undertime_minutes) || 0,
-      present: hoursWorked > 0,
-      dayType: classifyDayType(r.shift_schedule as string | null),
+      present: hoursWorked > 0 || zeroHourVacation || zeroHourWorked,
+      dayType,
     };
   });
 

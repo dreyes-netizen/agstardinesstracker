@@ -7,7 +7,10 @@
 // employee wasn't expected to work — they must not count as Absent or
 // inflate Required Hours. ("REST DAY" is a separate, pre-existing case
 // already filtered out at ingest in lib/parsers/attendance.ts.)
-export type DayType = 'working' | 'holiday' | 'on-leave' | 'unpaid-leave' | 'not-yet-hired';
+// 'vacation' isn't produced by classifyDayType (it's not a shift_schedule
+// text pattern) — it's assigned by callers when a zero-hour day is covered
+// by an approved Vacation leave record. See getEmployeeScoreDetail.
+export type DayType = 'working' | 'holiday' | 'on-leave' | 'unpaid-leave' | 'not-yet-hired' | 'vacation';
 
 // Order matters: first match wins. NOT YET HIRED / UNPAID LEAVE checked
 // before the broader HOLIDAY / ON LEAVE so more specific labels win.
@@ -28,6 +31,7 @@ export const DAY_TYPE_LABEL: Record<DayType, string> = {
   'on-leave': 'On Leave',
   'unpaid-leave': 'Unpaid Leave',
   'not-yet-hired': 'Not Yet Hired',
+  vacation: 'Vacation',
 };
 
 export function classifyDayType(shiftSchedule: string | null | undefined): DayType {

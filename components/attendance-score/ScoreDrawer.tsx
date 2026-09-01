@@ -51,8 +51,12 @@ export function ScoreDrawer({ score, start, end, onClose }: ScoreDrawerProps) {
   // Holiday / On Leave / Unpaid Leave / Not Yet Hired are 0-hour days the
   // employee wasn't expected to work — they read as such instead of "Absent"
   // (score math in attendance-score.ts already excludes them from absent/required hours).
+  // 'vacation' is a rare zero-hour day covered by an approved Vacation
+  // request that Sprout's own schedule text separately tags Holiday/Unpaid —
+  // it's colored like Present because it counts toward present/required hours.
   const statusMeta = {
     sick: { label: 'Sick Leave', cls: 'bg-amber/10 text-amber' },
+    vacation: { label: 'Vacation', cls: 'bg-safe-green/10 text-safe-green' },
     present: { label: 'Present', cls: 'bg-safe-green/10 text-safe-green' },
     absent: { label: 'Absent', cls: 'bg-nte-red/10 text-nte-red' },
     holiday: { label: 'Holiday', cls: 'bg-app-blue/10 text-app-blue' },
