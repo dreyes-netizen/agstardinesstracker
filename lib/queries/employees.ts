@@ -1,5 +1,5 @@
 import { db } from '@/lib/db';
-import { employees, attendanceRecords, nteRecords, leaveRecords } from '@/lib/db/schema';
+import { employees, attendanceRecords, nteRecords, leaveRecords, lateAdjustments } from '@/lib/db/schema';
 import { asc, notInArray, sql } from 'drizzle-orm';
 import { notExcludedSql } from '@/lib/queries/exclusions';
 
@@ -173,6 +173,7 @@ export async function replaceRoster(
 
   if (toRemove.length > 0) {
     const removeIds = toRemove.map((r) => r.employeeId);
+    await db.delete(lateAdjustments).where(notInArray(lateAdjustments.employeeId, keepIds));
     await db.delete(attendanceRecords).where(notInArray(attendanceRecords.employeeId, keepIds));
     await db.delete(nteRecords).where(notInArray(nteRecords.employeeId, keepIds));
     await db.delete(leaveRecords).where(notInArray(leaveRecords.employeeId, keepIds));

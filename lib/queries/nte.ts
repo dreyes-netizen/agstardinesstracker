@@ -2,6 +2,7 @@ import { db } from '@/lib/db';
 import { nteRecords, attendanceRecords, employees } from '@/lib/db/schema';
 import { and, eq, sql, SQL } from 'drizzle-orm';
 import { notExcludedSql, employeeNotExcludedSql } from '@/lib/queries/exclusions';
+import { adjustmentJoinSql, effectiveLateSql } from '@/lib/queries/adjustments';
 
 export async function upsertNteRequired(employeeId: string, month: string) {
   await db
@@ -16,15 +17,16 @@ export async function syncNteForMonth(month: string) {
   await db.execute(sql`
     INSERT INTO nte_records (employee_id, month, status)
     SELECT
-      employee_id,
+      a.employee_id,
       ${month} AS month,
       'required'  AS status
-    FROM attendance_records
-    WHERE TO_CHAR(date::date, 'YYYY-MM') = ${month}
-      AND ${employeeNotExcludedSql('employee_id')}
-    GROUP BY employee_id
-    HAVING COUNT(CASE WHEN late_minutes > 0 THEN 1 END) >= 6
-        OR COALESCE(SUM(late_minutes), 0) >= 60
+    FROM attendance_records a
+    ${adjustmentJoinSql('a')}
+    WHERE TO_CHAR(a.date::date, 'YYYY-MM') = ${month}
+      AND ${employeeNotExcludedSql('a.employee_id')}
+    GROUP BY a.employee_id
+    HAVING COUNT(CASE WHEN ${effectiveLateSql('a')} > 0 THEN 1 END) >= 6
+        OR COALESCE(SUM(${effectiveLateSql('a')}), 0) >= 60
     ON CONFLICT (employee_id, month) DO NOTHING
   `);
 }
@@ -34,14 +36,15 @@ export async function syncAllNteRequired() {
   await db.execute(sql`
     INSERT INTO nte_records (employee_id, month, status)
     SELECT
-      employee_id,
-      TO_CHAR(date::date, 'YYYY-MM') AS month,
-      'required'                      AS status
-    FROM attendance_records
-    WHERE ${employeeNotExcludedSql('employee_id')}
-    GROUP BY employee_id, TO_CHAR(date::date, 'YYYY-MM')
-    HAVING COUNT(CASE WHEN late_minutes > 0 THEN 1 END) >= 6
-        OR COALESCE(SUM(late_minutes), 0) >= 60
+      a.employee_id,
+      TO_CHAR(a.date::date, 'YYYY-MM') AS month,
+      'required'                        AS status
+    FROM attendance_records a
+    ${adjustmentJoinSql('a')}
+    WHERE ${employeeNotExcludedSql('a.employee_id')}
+    GROUP BY a.employee_id, TO_CHAR(a.date::date, 'YYYY-MM')
+    HAVING COUNT(CASE WHEN ${effectiveLateSql('a')} > 0 THEN 1 END) >= 6
+        OR COALESCE(SUM(${effectiveLateSql('a')}), 0) >= 60
     ON CONFLICT (employee_id, month) DO NOTHING
   `);
 }
@@ -132,13 +135,14 @@ export async function getNteList(filters: NteListFilters = {}) {
       n.issued_by,
       n.notes,
       n.acknowledged_date,
-      COUNT(CASE WHEN a.late_minutes > 0 THEN 1 END)::int AS late_count,
-      COALESCE(SUM(a.late_minutes), 0)::int AS accumulated_minutes
+      COUNT(CASE WHEN ${effectiveLateSql('a')} > 0 THEN 1 END)::int AS late_count,
+      COALESCE(SUM(${effectiveLateSql('a')}), 0)::int AS accumulated_minutes
     FROM nte_records n
     JOIN employees e ON n.employee_id = e.employee_id
     LEFT JOIN attendance_records a
       ON n.employee_id = a.employee_id
       AND TO_CHAR(a.date::date, 'YYYY-MM') = n.month
+    ${adjustmentJoinSql('a')}
     ${whereClause}
     GROUP BY n.id, n.employee_id, e.first_name, e.last_name, e.middle_name,
              e.department, e.immediate_supervisor, e.approver2,

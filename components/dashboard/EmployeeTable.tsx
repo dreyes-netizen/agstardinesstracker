@@ -69,6 +69,7 @@ interface EmployeeTableProps {
   dept?: string;
   supervisor?: string;
   manager?: string;
+  isAdmin: boolean;
 }
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -78,10 +79,13 @@ function escCsv(v: string | number | null | undefined): string {
   return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
-export function EmployeeTable({ data, year, month, dept, supervisor, manager }: EmployeeTableProps) {
+export function EmployeeTable({ data, year, month, dept, supervisor, manager, isAdmin }: EmployeeTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 50 });
-  const [selected, setSelected] = useState<EmployeeMonthlyStats | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Looked up from fresh `data` so drawer totals update after router.refresh().
+  const selected = useMemo(() => data.find((e) => e.employeeId === selectedId) ?? null, [data, selectedId]);
+  const setSelected = (e: EmployeeMonthlyStats | null) => setSelectedId(e?.employeeId ?? null);
   const [search, setSearch] = useState('');
   const [hideZero, setHideZero] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
@@ -279,6 +283,7 @@ export function EmployeeTable({ data, year, month, dept, supervisor, manager }: 
         employee={selected}
         year={year}
         month={month}
+        isAdmin={isAdmin}
         onClose={() => setSelected(null)}
         onNteAction={() => setSelected(null)}
       />

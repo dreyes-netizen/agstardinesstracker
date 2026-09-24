@@ -31,8 +31,18 @@ function fmtMonth(m: string): string {
 function actionClass(a: string): string {
   if (a === 'issued') return 'bg-app-blue/10 text-app-blue';
   if (a === 'acknowledged') return 'bg-safe-green/10 text-safe-green';
+  if (a === 'late_adjusted' || a === 'late_waived') return 'bg-amber/10 text-amber-dark';
   return 'bg-muted/10 text-muted';
 }
+const ACTION_LABELS: Record<string, string> = {
+  issued: 'Issued',
+  acknowledged: 'Acknowledged',
+  late_adjusted: 'Late adjusted',
+  late_waived: 'Late waived',
+  late_adjustment_removed: 'Adjustment removed',
+  nte_auto_cleared: 'NTE auto-cleared',
+};
+const actionLabel = (a: string) => ACTION_LABELS[a] ?? a;
 
 const col = createColumnHelper<AuditEntry>();
 const columns = [
@@ -54,8 +64,8 @@ const columns = [
   col.accessor('action', {
     header: 'Action',
     cell: (info) => (
-      <span className={`inline-block text-[11px] font-medium px-1.5 py-0.5 rounded-[3px] capitalize ${actionClass(info.getValue())}`}>
-        {info.getValue()}
+      <span className={`inline-block text-[11px] font-medium px-1.5 py-0.5 rounded-[3px] whitespace-nowrap ${actionClass(info.getValue())}`}>
+        {actionLabel(info.getValue())}
       </span>
     ),
   }),
@@ -161,8 +171,9 @@ export function AuditTable({ data }: { data: AuditEntry[] }) {
           className="flex-shrink-0 bg-ground border border-border rounded-[5px] px-2.5 py-1.5 text-[12.5px] text-app-text focus:outline-none focus-visible:ring-2 focus-visible:ring-app-blue/40"
         >
           <option value="">All actions</option>
-          <option value="issued">Issued</option>
-          <option value="acknowledged">Acknowledged</option>
+          {Object.entries(ACTION_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
         </select>
         <span className="text-[11.5px] text-muted flex-shrink-0">{filtered.length} entries</span>
         <button

@@ -4,6 +4,7 @@ import { StatCards } from '@/components/dashboard/StatCards';
 import { DayOfWeekCards } from '@/components/dashboard/DayOfWeekCards';
 import { EmployeeTable } from '@/components/dashboard/EmployeeTable';
 import { getFilterOptions } from '@/lib/queries/employees';
+import { getSessionUser } from '@/lib/auth/session';
 import { getMonthlyStats, hasAttendanceData, getLatestAttendancePeriod, getLateByDayOfWeek } from '@/lib/queries/attendance';
 
 interface PageProps {
@@ -25,9 +26,10 @@ export default async function DashboardPage({ searchParams }: PageProps) {
 
   // Round 1: latestPeriod always runs so the "Data through …" label stays visible
   // on every filter selection, not just the initial page load.
-  const [latestPeriod, filterOptions] = await Promise.all([
+  const [latestPeriod, filterOptions, user] = await Promise.all([
     getLatestAttendancePeriod(),
     getFilterOptions(),
+    getSessionUser(),
   ]);
 
   const year  = Number(searchParams.year)  || latestPeriod?.year  || now.getFullYear();
@@ -82,7 +84,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           </div>
         )}
         {dataExists ? (
-          <EmployeeTable data={employees} year={year} month={month} dept={dept} supervisor={supervisor} manager={manager} />
+          <EmployeeTable data={employees} year={year} month={month} dept={dept} supervisor={supervisor} manager={manager} isAdmin={user?.role === 'admin'} />
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-center">
             <p className="text-[15px] font-medium text-app-text">No attendance data for {monthLabel}</p>

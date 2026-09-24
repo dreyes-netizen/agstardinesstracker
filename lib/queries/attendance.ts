@@ -1,8 +1,9 @@
 import { db } from '@/lib/db';
 import { attendanceRecords, employees, nteRecords, uploadHistory } from '@/lib/db/schema';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, sql } from 'drizzle-orm';
 import { computeNteStatus, NteStatus } from '@/lib/utils/nte-status';
 import { notExcludedSql } from '@/lib/queries/exclusions';
+import { adjustmentJoinSql, effectiveLateSql } from '@/lib/queries/adjustments';
 
 export interface EmployeeMonthlyStats {
   employeeId: string;
@@ -45,8 +46,8 @@ export async function getMonthlyStats(filters: DashboardFilters): Promise<Employ
       e.department,
       e.immediate_supervisor,
       e.approver2,
-      COUNT(CASE WHEN a.late_minutes > 0 THEN 1 END)::int AS late_count,
-      COALESCE(SUM(a.late_minutes), 0)::int AS accumulated_minutes,
+      COUNT(CASE WHEN ${effectiveLateSql('a')} > 0 THEN 1 END)::int AS late_count,
+      COALESCE(SUM(${effectiveLateSql('a')}), 0)::int AS accumulated_minutes,
       n.id AS nte_record_id,
       n.status AS nte_db_status,
       n.issued_date,
@@ -57,6 +58,7 @@ export async function getMonthlyStats(filters: DashboardFilters): Promise<Employ
       ON e.employee_id = a.employee_id
       AND a.date >= ${monthStart}::date
       AND a.date < ${periodEnd}::date
+    ${adjustmentJoinSql('a')}
     LEFT JOIN nte_records n
       ON e.employee_id = n.employee_id
       AND n.month = ${monthStr}
@@ -121,7 +123,8 @@ export async function getLateByDayOfWeek(filters: DashboardFilters): Promise<Day
       COUNT(DISTINCT a.employee_id)::int  AS late_employees
     FROM attendance_records a
     JOIN employees e ON a.employee_id = e.employee_id
-    WHERE a.late_minutes > 0
+    ${adjustmentJoinSql('a')}
+    WHERE ${effectiveLateSql('a')} > 0
       AND a.date >= ${monthStart}::date
       AND a.date < ${periodEnd}::date
       AND (${filters.department          ?? null}::text IS NULL OR e.department           = ${filters.department          ?? null}::text)
@@ -182,24 +185,53 @@ export async function hasAttendanceData(year: number, month: number): Promise<bo
   return (result.rows[0] as Record<string, unknown>).has_data === true;
 }
 
-export async function getEmployeeLateRecords(employeeId: string, year: number, month: number) {
+export interface EmployeeLateRecord {
+  date: string;
+  lateMinutes: number;          // effective (after adjustment)
+  originalMinutes: number;
+  adjusted: boolean;
+  reason: string | null;
+  adjustedBy: string | null;
+  shiftSchedule: string | null;
+  actualLogs: string | null;
+}
+
+// Filters on the ORIGINAL late minutes so waived days stay visible (and undoable)
+// in the employee drawer.
+export async function getEmployeeLateRecords(employeeId: string, year: number, month: number): Promise<EmployeeLateRecord[]> {
   const monthStr = `${year}-${String(month).padStart(2, '0')}`;
   const monthStart = `${monthStr}-01`;
   const nextY = month === 12 ? year + 1 : year;
   const nextM = month === 12 ? 1 : month + 1;
   const periodEnd = `${nextY}-${String(nextM).padStart(2, '0')}-01`;
-  return db
-    .select()
-    .from(attendanceRecords)
-    .where(
-      and(
-        eq(attendanceRecords.employeeId, employeeId),
-        sql`${attendanceRecords.date} >= ${monthStart}::date`,
-        sql`${attendanceRecords.date} < ${periodEnd}::date`,
-        sql`${attendanceRecords.lateMinutes} > 0`,
-      ),
-    )
-    .orderBy(attendanceRecords.date);
+  const rows = await db.execute(sql`
+    SELECT
+      a.date::text AS date,
+      ${effectiveLateSql('a')} AS late_minutes,
+      a.late_minutes AS original_minutes,
+      adj.id IS NOT NULL AS adjusted,
+      adj.reason,
+      adj.created_by AS adjusted_by,
+      a.shift_schedule,
+      a.actual_logs
+    FROM attendance_records a
+    ${adjustmentJoinSql('a')}
+    WHERE a.employee_id = ${employeeId}
+      AND a.date >= ${monthStart}::date
+      AND a.date < ${periodEnd}::date
+      AND a.late_minutes > 0
+    ORDER BY a.date
+  `);
+  return (rows.rows as Record<string, unknown>[]).map((r) => ({
+    date: String(r.date),
+    lateMinutes: Number(r.late_minutes) || 0,
+    originalMinutes: Number(r.original_minutes) || 0,
+    adjusted: r.adjusted === true,
+    reason: r.reason ? String(r.reason) : null,
+    adjustedBy: r.adjusted_by ? String(r.adjusted_by) : null,
+    shiftSchedule: r.shift_schedule ? String(r.shift_schedule) : null,
+    actualLogs: r.actual_logs ? String(r.actual_logs) : null,
+  }));
 }
 
 export interface TardinessIncident {
@@ -218,31 +250,28 @@ export async function getEmployeeTardinessDetail(
   start: string,
   end: string,
 ): Promise<TardinessIncident[]> {
-  const rows = await db
-    .select({
-      date: attendanceRecords.date,
-      lateMinutes: attendanceRecords.lateMinutes,
-      undertimeMinutes: attendanceRecords.undertimeMinutes,
-      shiftSchedule: attendanceRecords.shiftSchedule,
-      actualLogs: attendanceRecords.actualLogs,
-    })
-    .from(attendanceRecords)
-    .where(
-      and(
-        eq(attendanceRecords.employeeId, employeeId),
-        sql`${attendanceRecords.date} >= ${start}::date`,
-        sql`${attendanceRecords.date} <= ${end}::date`,
-        sql`${attendanceRecords.lateMinutes} > 0`,
-      ),
-    )
-    .orderBy(attendanceRecords.date);
+  const rows = await db.execute(sql`
+    SELECT
+      a.date::text AS date,
+      ${effectiveLateSql('a')} AS late_minutes,
+      a.undertime_minutes,
+      a.shift_schedule,
+      a.actual_logs
+    FROM attendance_records a
+    ${adjustmentJoinSql('a')}
+    WHERE a.employee_id = ${employeeId}
+      AND a.date >= ${start}::date
+      AND a.date <= ${end}::date
+      AND ${effectiveLateSql('a')} > 0
+    ORDER BY a.date
+  `);
 
-  return rows.map((r) => ({
+  return (rows.rows as Record<string, unknown>[]).map((r) => ({
     date: String(r.date),
-    lateMinutes: Number(r.lateMinutes) || 0,
-    undertimeMinutes: Number(r.undertimeMinutes) || 0,
-    shiftSchedule: r.shiftSchedule ?? null,
-    actualLogs: r.actualLogs ?? null,
+    lateMinutes: Number(r.late_minutes) || 0,
+    undertimeMinutes: Number(r.undertime_minutes) || 0,
+    shiftSchedule: r.shift_schedule ? String(r.shift_schedule) : null,
+    actualLogs: r.actual_logs ? String(r.actual_logs) : null,
   }));
 }
 

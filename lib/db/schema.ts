@@ -1,6 +1,7 @@
 import {
-  pgTable, serial, text, integer, numeric, date, timestamp, boolean, uniqueIndex,
+  pgTable, serial, text, integer, numeric, date, timestamp, boolean, uniqueIndex, check,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 // Allowlist + roles for app access. A row here = an account permitted to sign in.
 // role: 'admin' (everything, incl. upload + user management) | 'manager'
@@ -79,6 +80,24 @@ export const attendanceRecords = pgTable('attendance_records', {
   employeeDateUniq: uniqueIndex('attendance_employee_date_idx').on(t.employeeId, t.date),
 }));
 
+// Admin overlay on attendance_records.late_minutes for the tardiness/NTE views only
+// (Attendance Score keeps reading the raw value). Keyed on (employee_id, date), not
+// the attendance row id, because re-uploads delete and re-insert attendance rows.
+// adjusted_minutes = 0 means the day is waived.
+export const lateAdjustments = pgTable('late_adjustments', {
+  id: serial('id').primaryKey(),
+  employeeId: text('employee_id').notNull().references(() => employees.employeeId),
+  date: date('date').notNull(),
+  adjustedMinutes: integer('adjusted_minutes').notNull(),
+  reason: text('reason').notNull(),
+  createdBy: text('created_by').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (t) => ({
+  employeeDateUniq: uniqueIndex('late_adj_employee_date_idx').on(t.employeeId, t.date),
+  minutesNonNegative: check('late_adj_minutes_nonneg', sql`${t.adjustedMinutes} >= 0`),
+}));
+
 export const nteRecords = pgTable('nte_records', {
   id: serial('id').primaryKey(),
   employeeId: text('employee_id').notNull().references(() => employees.employeeId),
@@ -133,4 +152,5 @@ export type LeaveRecord = typeof leaveRecords.$inferSelect;
 export type AppUser = typeof appUsers.$inferSelect;
 export type NteAuditEntry = typeof nteAuditLog.$inferSelect;
 export type ExcludedDepartment = typeof excludedDepartments.$inferSelect;
+export type LateAdjustment = typeof lateAdjustments.$inferSelect;
 export type Role = 'admin' | 'manager';

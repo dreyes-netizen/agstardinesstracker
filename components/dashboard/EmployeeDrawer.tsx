@@ -1,22 +1,18 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
-import { EmployeeMonthlyStats } from '@/lib/queries/attendance';
+import type { EmployeeMonthlyStats, EmployeeLateRecord } from '@/lib/queries/attendance';
 import { NteForm } from './NteForm';
+import { LateAdjustForm } from './LateAdjustForm';
 import { formatDate } from '@/lib/utils/date';
-
-interface LateRecord {
-  date: string;
-  lateMinutes: number;
-  shiftSchedule: string | null;
-  actualLogs: string | null;
-}
 
 interface EmployeeDrawerProps {
   employee: EmployeeMonthlyStats | null;
   year: number;
   month: number;
+  isAdmin?: boolean;
   onClose: () => void;
   onNteAction: () => void;
 }
@@ -26,14 +22,24 @@ function getDay(dateStr: string) {
   return DAY_NAMES[new Date(dateStr + 'T00:00:00').getDay()];
 }
 
-export function EmployeeDrawer({ employee, year, month, onClose, onNteAction }: EmployeeDrawerProps) {
-  const [lateRecords, setLateRecords] = useState<LateRecord[]>([]);
+export function EmployeeDrawer({ employee, year, month, isAdmin = false, onClose, onNteAction }: EmployeeDrawerProps) {
+  const router = useRouter();
+  const [lateRecords, setLateRecords] = useState<EmployeeLateRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState(false);
+  const [editingDate, setEditingDate] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
   const monthStr = `${year}-${String(month).padStart(2, '0')}`;
 
+  function handleAdjusted() {
+    setEditingDate(null);
+    setReloadKey((k) => k + 1);
+    router.refresh();
+  }
+
   useEffect(() => {
+    setEditingDate(null);
     if (!employee) { setLateRecords([]); setFetchError(false); return; }
     abortRef.current?.abort();
     const controller = new AbortController();
@@ -42,13 +48,13 @@ export function EmployeeDrawer({ employee, year, month, onClose, onNteAction }: 
     setFetchError(false);
     fetch(`/api/employee/${employee.employeeId}/lates?year=${year}&month=${month}`, { signal: controller.signal })
       .then((r) => r.json())
-      .then((data: LateRecord[]) => setLateRecords(data))
+      .then((data: EmployeeLateRecord[]) => setLateRecords(data))
       .catch((err) => { if (err.name !== 'AbortError') setFetchError(true); })
       .finally(() => setLoading(false));
     return () => controller.abort();
     // Keyed on employeeId (not the whole employee object) intentionally.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [employee?.employeeId, year, month]);
+  }, [employee?.employeeId, year, month, reloadKey]);
 
   if (!employee) return null;
 
@@ -113,18 +119,68 @@ export function EmployeeDrawer({ employee, year, month, onClose, onNteAction }: 
                     <th className="font-mono text-[9.5px] tracking-[0.09em] uppercase text-muted text-left pb-2">Date</th>
                     <th className="font-mono text-[9.5px] tracking-[0.09em] uppercase text-muted text-left pb-2">Day</th>
                     <th className="font-mono text-[9.5px] tracking-[0.09em] uppercase text-muted text-right pb-2">Minutes</th>
+                    {isAdmin && <th className="pb-2 w-12"><span className="sr-only">Adjust</span></th>}
                   </tr>
                 </thead>
                 <tbody>
-                  {lateRecords.map((r) => (
-                    <tr key={r.date} className="border-b border-row-border">
-                      <td className="font-mono text-[12px] py-2 whitespace-nowrap">{formatDate(r.date)}</td>
-                      <td className="text-[12px] text-muted py-2">{getDay(r.date)}</td>
-                      <td className="font-mono text-[13px] font-semibold text-nte-red text-right py-2">
-                        {r.lateMinutes} <span className="text-[10px] text-muted font-normal">min</span>
-                      </td>
-                    </tr>
-                  ))}
+                  {lateRecords.map((r) => {
+                    const waived = r.adjusted && r.lateMinutes === 0;
+                    const editing = editingDate === r.date;
+                    return (
+                      <Fragment key={r.date}>
+                        <tr className={r.adjusted || editing ? '' : 'border-b border-row-border'}>
+                          <td className="font-mono text-[12px] py-2 whitespace-nowrap">{formatDate(r.date)}</td>
+                          <td className="text-[12px] text-muted py-2">{getDay(r.date)}</td>
+                          <td className="font-mono text-[13px] font-semibold text-right py-2 whitespace-nowrap">
+                            {r.adjusted && (
+                              <span className="text-[11px] text-muted font-normal line-through mr-1.5">{r.originalMinutes}</span>
+                            )}
+                            {waived ? (
+                              <span className="inline-block text-[10.5px] font-medium font-sans px-1.5 py-0.5 rounded-[3px] bg-amber/10 text-amber-dark">Waived</span>
+                            ) : (
+                              <span className="text-nte-red">
+                                {r.lateMinutes} <span className="text-[10px] text-muted font-normal">min</span>
+                              </span>
+                            )}
+                          </td>
+                          {isAdmin && (
+                            <td className="py-2 text-right">
+                              <button
+                                type="button"
+                                onClick={() => setEditingDate(editing ? null : r.date)}
+                                className="text-[11px] text-app-blue hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-blue/40 rounded-[3px] px-1"
+                              >
+                                {editing ? 'Close' : r.adjusted ? 'Edit' : 'Adjust'}
+                              </button>
+                            </td>
+                          )}
+                        </tr>
+                        {r.adjusted && !editing && (
+                          <tr className="border-b border-row-border">
+                            <td colSpan={isAdmin ? 4 : 3} className="pb-2 text-[11px] text-muted">
+                              {r.reason}{r.adjustedBy && <span className="text-muted/70"> · {r.adjustedBy}</span>}
+                            </td>
+                          </tr>
+                        )}
+                        {editing && employee && (
+                          <tr className="border-b border-row-border">
+                            <td colSpan={4} className="pb-3">
+                              <LateAdjustForm
+                                employeeId={employee.employeeId}
+                                date={r.date}
+                                originalMinutes={r.originalMinutes}
+                                adjusted={r.adjusted}
+                                currentMinutes={r.lateMinutes}
+                                currentReason={r.reason}
+                                onDone={handleAdjusted}
+                                onCancel={() => setEditingDate(null)}
+                              />
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             )}

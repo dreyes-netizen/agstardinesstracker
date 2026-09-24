@@ -23,7 +23,7 @@ export function NteHistory({ employeeId, month }: { employeeId: string; month: s
       <ul className="space-y-2">
         {items.map((it) => (
           <li key={it.id} className="text-[11.5px] text-muted leading-snug">
-            <span className="capitalize text-app-text font-medium">{it.action}</span>
+            <span className="capitalize text-app-text font-medium">{it.action.replace(/_/g, ' ')}</span>
             {' by '}<span className="text-app-text">{it.actorEmail}</span>
             {' · '}
             {new Date(it.createdAt).toLocaleString('en-US', {
