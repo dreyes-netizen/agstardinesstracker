@@ -51,7 +51,7 @@ function rowToStats(row: NteRow): EmployeeMonthlyStats {
   };
 }
 
-export function NteTable({ rows }: { rows: NteRow[] }) {
+export function NteTable({ rows, isAdmin }: { rows: NteRow[]; isAdmin: boolean }) {
   const router = useRouter();
   const [issueForm, setIssueForm] = useState<{ employeeId: string; month: string } | null>(null);
   const [notes, setNotes] = useState('');
@@ -155,7 +155,10 @@ export function NteTable({ rows }: { rows: NteRow[] }) {
                   <td className="px-4 py-3 font-mono text-[13px] text-right hidden md:table-cell">{row.accumulated_minutes} <span className="text-[10px] text-muted">min</span></td>
                   <td className="px-4 py-3"><StatusBadge status={row.status as 'required' | 'issued' | 'acknowledged'} /></td>
                   <td className="px-4 py-3 pr-5">
-                    {row.status === 'required' && (
+                    {row.status === 'required' && !isAdmin && (
+                      <span className="text-[11px] text-muted">Awaiting admin</span>
+                    )}
+                    {row.status === 'required' && isAdmin && (
                       <Button size="sm" variant="outline" className="text-[11px] border-nte-red/30 text-nte-red hover:bg-nte-red/5 h-7 px-3" onClick={() => setIssueForm({ employeeId: row.employee_id, month: row.month })}>
                         Issue NTE
                       </Button>
@@ -167,9 +170,9 @@ export function NteTable({ rows }: { rows: NteRow[] }) {
                           {row.issued_by && <> by <span className="font-medium text-app-text">{row.issued_by}</span></>}
                         </div>
                         {row.notes && <div className="text-[11px] text-muted italic">&ldquo;{row.notes}&rdquo;</div>}
-                        <Button size="sm" variant="outline" disabled={ackLoadingId === `${row.employee_id}-${row.month}`} className="text-[11px] border-safe-green/30 text-safe-green hover:bg-safe-green/5 h-7 px-3" onClick={() => handleAcknowledge(row.employee_id, row.month)}>
+                        {isAdmin && <Button size="sm" variant="outline" disabled={ackLoadingId === `${row.employee_id}-${row.month}`} className="text-[11px] border-safe-green/30 text-safe-green hover:bg-safe-green/5 h-7 px-3" onClick={() => handleAcknowledge(row.employee_id, row.month)}>
                           {ackLoadingId === `${row.employee_id}-${row.month}` ? 'Saving…' : 'Mark Acknowledged'}
-                        </Button>
+                        </Button>}
                       </div>
                     )}
                     {row.status === 'acknowledged' && (
@@ -216,6 +219,7 @@ export function NteTable({ rows }: { rows: NteRow[] }) {
       <EmployeeDrawer
         employee={selected ? rowToStats(selected) : null}
         year={drawerYear}
+        isAdmin={isAdmin}
         month={drawerMonthNum}
         onClose={() => setSelected(null)}
         onNteAction={() => setSelected(null)}

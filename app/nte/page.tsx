@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { NteTable } from '@/components/nte/NteTable';
 import { NteFilterBar } from '@/components/nte/NteFilterBar';
+import { getSessionUser } from '@/lib/auth/session';
 import { getNteList, getNteFilterOptions, getNteCounts } from '@/lib/queries/nte';
 
 export const dynamic = 'force-dynamic';
@@ -15,7 +16,7 @@ interface PageProps {
 }
 
 export default async function NtePage({ searchParams }: PageProps) {
-  const filterOptions = await getNteFilterOptions();
+  const [filterOptions, user] = await Promise.all([getNteFilterOptions(), getSessionUser()]);
 
   // Derive defaults from the latest entry (already sorted DESC).
   const [defaultYear, defaultMonthNum] = (filterOptions.months[0] || '').split('-');
@@ -40,7 +41,7 @@ export default async function NtePage({ searchParams }: PageProps) {
       <div className="bg-white border-b border-border flex-shrink-0">
         <div className="px-6 pt-4 pb-3">
           <h1 className="text-[15px] font-semibold text-app-text tracking-tight">NTE Management</h1>
-          <p className="text-[12px] text-muted mt-0.5">Employees who crossed the tardiness threshold. Issue and track NTE documents here.</p>
+          <p className="text-[12px] text-muted mt-0.5">Employees who crossed the tardiness threshold. Admins issue and acknowledge NTE documents here.</p>
         </div>
         <Suspense>
           <NteFilterBar
@@ -76,7 +77,7 @@ export default async function NtePage({ searchParams }: PageProps) {
           </div>
         </div>
 
-        <NteTable rows={rows as unknown as Parameters<typeof NteTable>[0]['rows']} />
+        <NteTable rows={rows as unknown as Parameters<typeof NteTable>[0]['rows']} isAdmin={user?.role === 'admin'} />
       </div>
     </div>
   );

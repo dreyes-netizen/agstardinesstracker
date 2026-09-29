@@ -197,6 +197,7 @@ export function EmployeeDrawer({ employee, year, month, isAdmin = false, onClose
                 issuedBy={employee.issuedBy}
                 acknowledgedDate={employee.acknowledgedDate}
                 notes={null}
+                isAdmin={isAdmin}
                 onSuccess={onNteAction}
               />
             </div>

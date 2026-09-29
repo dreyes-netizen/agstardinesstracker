@@ -32,7 +32,7 @@ export async function getNteHistoryAction(employeeId: string, month: string): Pr
 // issuedBy is derived from the authenticated session — never trusted from the
 // client — and every action is recorded in the NTE audit trail.
 export async function issueNteAction(employeeId: string, month: string, notes: string) {
-  const user = await requireRole('manager'); // admin or manager
+  const user = await requireRole('admin');
   // Show the person's name on the NTE; the audit log keeps the email for identity.
   await issueNte(employeeId, month, user.displayName || user.email, notes);
   await addNteAuditEntry({
@@ -45,7 +45,7 @@ export async function issueNteAction(employeeId: string, month: string, notes: s
 }
 
 export async function acknowledgeNteAction(employeeId: string, month: string) {
-  const user = await requireRole('manager');
+  const user = await requireRole('admin');
   await acknowledgeNte(employeeId, month);
   await addNteAuditEntry({
     employeeId, month, action: 'acknowledged',
