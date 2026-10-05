@@ -236,13 +236,24 @@ export async function getNteCounts(filters: { start: string; end: string; depart
   };
 }
 
-export async function getNteDepartments() {
-  const rows = await db.execute(sql`
-    SELECT DISTINCT department
-    FROM employees e
-    WHERE department IS NOT NULL
-      AND ${notExcludedSql('e')}
-    ORDER BY department ASC
-  `);
-  return (rows.rows as { department: string }[]).map((r) => r.department);
+export async function getNteFilterOptions() {
+  const [months, departments] = await Promise.all([
+    // Every month with uploaded attendance, newest first ("2026-09").
+    db.execute(sql`
+      SELECT DISTINCT TO_CHAR(date::date, 'YYYY-MM') AS month
+      FROM attendance_records
+      ORDER BY month DESC
+    `),
+    db.execute(sql`
+      SELECT DISTINCT department
+      FROM employees e
+      WHERE department IS NOT NULL
+        AND ${notExcludedSql('e')}
+      ORDER BY department ASC
+    `),
+  ]);
+  return {
+    months: (months.rows as { month: string }[]).map((r) => r.month),
+    departments: (departments.rows as { department: string }[]).map((r) => r.department),
+  };
 }

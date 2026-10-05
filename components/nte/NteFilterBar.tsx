@@ -11,7 +11,8 @@ interface Range {
 interface NteFilterBarProps {
   start: string;
   end: string;
-  presets: { lastWeek: Range; thisMonth: Range };
+  lastWeek: Range;
+  monthOptions: (Range & { label: string })[];
   departments: string[];
   selectedStatus?: string;
   selectedDept?: string;
@@ -30,7 +31,7 @@ const STATUS_OPTIONS = [
   { value: 'acknowledged', label: 'Acknowledged' },
 ];
 
-export function NteFilterBar({ start, end, presets, departments, selectedStatus, selectedDept }: NteFilterBarProps) {
+export function NteFilterBar({ start, end, lastWeek, monthOptions, departments, selectedStatus, selectedDept }: NteFilterBarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -55,6 +56,8 @@ export function NteFilterBar({ start, end, presets, departments, selectedStatus,
   );
 
   const isRange = (r: Range) => r.start === start && r.end === end;
+  // Shows the month only when the range is exactly that month; otherwise the placeholder.
+  const selectedMonth = monthOptions.findIndex(isRange);
 
   // The range is always set (defaulted on server), so only status/dept count as active.
   const hasFilters = !!(selectedStatus || selectedDept);
@@ -68,20 +71,36 @@ export function NteFilterBar({ start, end, presets, departments, selectedStatus,
         <span className={LABEL_CLS}>To</span>
         <input type="date" value={end} min={start}
           onChange={(e) => e.target.value && updateParam('end', e.target.value)} className={SELECT_CLS} />
-        {([['Last week', presets.lastWeek], ['This month', presets.thisMonth]] as const).map(([label, r]) => (
-          <button
-            key={label}
-            type="button"
-            onClick={() => setRange(r)}
-            aria-pressed={isRange(r)}
-            className={`${PRESET_CLS} ${isRange(r)
-              ? 'bg-app-blue/10 border-app-blue/30 text-app-blue font-medium'
-              : 'border-border text-muted hover:text-app-text'}`}
-          >
-            {label}
-          </button>
-        ))}
+        <button
+          type="button"
+          onClick={() => setRange(lastWeek)}
+          aria-pressed={isRange(lastWeek)}
+          className={`${PRESET_CLS} ${isRange(lastWeek)
+            ? 'bg-app-blue/10 border-app-blue/30 text-app-blue font-medium'
+            : 'border-border text-muted hover:text-app-text'}`}
+        >
+          Last week
+        </button>
       </div>
+
+      {monthOptions.length > 0 && (
+        <div className="flex items-center gap-2">
+          <span className={LABEL_CLS}>Month</span>
+          <select
+            value={selectedMonth}
+            onChange={(e) => {
+              const r = monthOptions[Number(e.target.value)];
+              if (r) setRange(r);
+            }}
+            className={SELECT_CLS}
+          >
+            <option value={-1} disabled>Select month</option>
+            {monthOptions.map((m, i) => (
+              <option key={m.label} value={i}>{m.label}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <div className="flex items-center gap-2">
         <span className={LABEL_CLS}>Status</span>

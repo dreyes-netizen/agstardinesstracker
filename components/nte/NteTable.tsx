@@ -152,8 +152,8 @@ export function NteTable({ rows, isAdmin }: { rows: NteRow[]; isAdmin: boolean }
                 </td>
                   <td className="px-4 py-3 text-[12px] text-muted hidden md:table-cell">{row.department ?? '—'}</td>
                   <td className="px-4 py-3 text-[12px] text-muted hidden md:table-cell">{row.immediate_supervisor ?? '—'}</td>
-                  <td className="px-4 py-3 font-mono text-[13px] text-right hidden md:table-cell">{row.late_count} <span className="text-[10px] text-muted">×</span></td>
-                  <td className="px-4 py-3 font-mono text-[13px] text-right hidden md:table-cell">{row.accumulated_minutes} <span className="text-[10px] text-muted">min</span></td>
+                  <td className="px-4 py-3 font-mono text-[13px] text-right whitespace-nowrap hidden md:table-cell">{row.late_count} <span className="text-[10px] text-muted">×</span></td>
+                  <td className="px-4 py-3 font-mono text-[13px] text-right whitespace-nowrap hidden md:table-cell">{row.accumulated_minutes} <span className="text-[10px] text-muted">min</span></td>
                   <td className="px-4 py-3 font-mono text-[12px] text-muted text-right whitespace-nowrap hidden lg:table-cell">{row.mtd_lates}<span className="text-[10px]">×</span> · {row.mtd_minutes}<span className="text-[10px]"> min</span></td>
                   <td className="px-4 py-3"><StatusBadge status={row.status as 'required' | 'issued' | 'acknowledged'} /></td>
                   <td className="px-4 py-3 pr-5">
