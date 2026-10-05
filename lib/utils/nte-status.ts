@@ -32,3 +32,14 @@ export function computeWeeklyNteStatus(
   if (needsNte) return 'required';
   return computeNteStatus(mtdLates, mtdMinutes, null) === 'safe' ? 'safe' : 'warning';
 }
+
+const URGENCY: NteDbStatus[] = ['required', 'issued', 'acknowledged'];
+
+// Dashboard row status for a date range: the most urgent NTE whose period falls in
+// the range, else month-to-date standing as of the range end (never 'required'
+// without an NTE row — those are created by the weekly sync).
+export function rangeNteStatus(nteStatuses: NteDbStatus[], mtdLates: number, mtdMinutes: number): NteStatus {
+  const top = URGENCY.find((s) => nteStatuses.includes(s));
+  if (top) return top;
+  return computeWeeklyNteStatus(false, mtdLates, mtdMinutes, null);
+}

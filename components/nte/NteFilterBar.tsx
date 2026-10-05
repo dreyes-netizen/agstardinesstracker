@@ -2,17 +2,14 @@
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useCallback } from 'react';
-
-interface Range {
-  start: string;
-  end: string;
-}
+import { DateRangeControls } from '@/components/filters/DateRangeControls';
+import type { MonthOption } from '@/lib/utils/week';
 
 interface NteFilterBarProps {
   start: string;
   end: string;
-  lastWeek: Range;
-  monthOptions: (Range & { label: string })[];
+  lastWeek: { start: string; end: string };
+  monthOptions: MonthOption[];
   departments: string[];
   selectedStatus?: string;
   selectedDept?: string;
@@ -21,8 +18,6 @@ interface NteFilterBarProps {
 const SELECT_CLS =
   'bg-ground border border-border rounded-[5px] px-2.5 py-1.5 text-[12.5px] text-app-text focus:outline-none focus-visible:ring-2 focus-visible:ring-app-blue/40 min-w-0 w-full md:w-auto';
 const LABEL_CLS = 'text-[12.5px] text-muted';
-const PRESET_CLS =
-  'px-2.5 py-1.5 rounded-[5px] border text-[11.5px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-app-blue/40';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All Statuses' },
@@ -51,56 +46,16 @@ export function NteFilterBar({ start, end, lastWeek, monthOptions, departments, 
   );
 
   const setRange = useCallback(
-    (r: Range) => pushParams((p) => { p.set('start', r.start); p.set('end', r.end); }),
+    (r: { start: string; end: string }) => pushParams((p) => { p.set('start', r.start); p.set('end', r.end); }),
     [pushParams],
   );
-
-  const isRange = (r: Range) => r.start === start && r.end === end;
-  // Shows the month only when the range is exactly that month; otherwise the placeholder.
-  const selectedMonth = monthOptions.findIndex(isRange);
 
   // The range is always set (defaulted on server), so only status/dept count as active.
   const hasFilters = !!(selectedStatus || selectedDept);
 
   return (
     <div className="px-4 md:px-6 pb-3 grid grid-cols-2 gap-2 md:flex md:items-center md:gap-6 md:flex-wrap">
-      <div className="col-span-2 flex items-center gap-2 flex-wrap">
-        <span className={LABEL_CLS}>From</span>
-        <input type="date" value={start} max={end}
-          onChange={(e) => e.target.value && updateParam('start', e.target.value)} className={SELECT_CLS} />
-        <span className={LABEL_CLS}>To</span>
-        <input type="date" value={end} min={start}
-          onChange={(e) => e.target.value && updateParam('end', e.target.value)} className={SELECT_CLS} />
-        <button
-          type="button"
-          onClick={() => setRange(lastWeek)}
-          aria-pressed={isRange(lastWeek)}
-          className={`${PRESET_CLS} ${isRange(lastWeek)
-            ? 'bg-app-blue/10 border-app-blue/30 text-app-blue font-medium'
-            : 'border-border text-muted hover:text-app-text'}`}
-        >
-          Last week
-        </button>
-      </div>
-
-      {monthOptions.length > 0 && (
-        <div className="flex items-center gap-2">
-          <span className={LABEL_CLS}>Month</span>
-          <select
-            value={selectedMonth}
-            onChange={(e) => {
-              const r = monthOptions[Number(e.target.value)];
-              if (r) setRange(r);
-            }}
-            className={SELECT_CLS}
-          >
-            <option value={-1} disabled>Select month</option>
-            {monthOptions.map((m, i) => (
-              <option key={m.label} value={i}>{m.label}</option>
-            ))}
-          </select>
-        </div>
-      )}
+      <DateRangeControls start={start} end={end} lastWeek={lastWeek} monthOptions={monthOptions} onChange={setRange} />
 
       <div className="flex items-center gap-2">
         <span className={LABEL_CLS}>Status</span>

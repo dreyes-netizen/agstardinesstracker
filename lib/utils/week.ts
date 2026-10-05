@@ -71,3 +71,21 @@ export function isValidNtePeriod(start: string, end: string): boolean {
   if (isFullMonth(start, end)) return end < WEEKLY_NTE_START;
   return weekStart(start) === start && end === addDays(start, 6) && end >= WEEKLY_NTE_START;
 }
+
+export interface MonthOption {
+  label: string;
+  start: string;
+  end: string;
+}
+
+// Month shortcuts for the date-range filters: "All time" plus each month
+// (YYYY-MM, newest first) as its full calendar span.
+export function buildMonthOptions(months: string[]): MonthOption[] {
+  const ranges = months.map((m) => {
+    const start = `${m}-01`;
+    const end = monthEnd(start);
+    return { label: formatPeriod(start, end), start, end };
+  });
+  if (!ranges.length) return [];
+  return [{ label: 'All time', start: ranges[ranges.length - 1].start, end: ranges[0].end }, ...ranges];
+}

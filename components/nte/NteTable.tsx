@@ -50,10 +50,15 @@ function rowToStats(row: NteRow): EmployeeStats {
     mtdLates: row.mtd_lates,
     mtdMinutes: row.mtd_minutes,
     nteStatus: row.status as NteStatus,
-    nteRecordId: row.id,
-    issuedDate: row.issued_date,
-    issuedBy: row.issued_by,
-    acknowledgedDate: row.acknowledged_date,
+    ntes: [{
+      periodStart: row.period_start,
+      periodEnd: row.period_end,
+      status: row.status as 'required' | 'issued' | 'acknowledged',
+      issuedDate: row.issued_date,
+      issuedBy: row.issued_by,
+      notes: row.notes,
+      acknowledgedDate: row.acknowledged_date,
+    }],
   };
 }
 

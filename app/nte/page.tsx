@@ -2,9 +2,9 @@ import { Suspense } from 'react';
 import { NteTable } from '@/components/nte/NteTable';
 import { NteFilterBar } from '@/components/nte/NteFilterBar';
 import { getSessionUser } from '@/lib/auth/session';
-import { getNteList, getNteFilterOptions, getNteCounts } from '@/lib/queries/nte';
-import { getLatestAttendancePeriod } from '@/lib/queries/attendance';
-import { addDays, formatPeriod, isIsoDate, lastCompleteWeekStart, monthEnd, todayPH } from '@/lib/utils/week';
+import { getNteList, getNteDepartments, getNteCounts } from '@/lib/queries/nte';
+import { getAttendanceMonths, getLatestAttendancePeriod } from '@/lib/queries/attendance';
+import { addDays, buildMonthOptions, isIsoDate, lastCompleteWeekStart, todayPH } from '@/lib/utils/week';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,8 +18,8 @@ interface PageProps {
 }
 
 export default async function NtePage({ searchParams }: PageProps) {
-  const [{ months, departments }, latestPeriod, user] = await Promise.all([
-    getNteFilterOptions(), getLatestAttendancePeriod(), getSessionUser(),
+  const [months, departments, latestPeriod, user] = await Promise.all([
+    getAttendanceMonths(), getNteDepartments(), getLatestAttendancePeriod(), getSessionUser(),
   ]);
 
   // "Last week" is the latest Mon–Sun week the uploaded data fully covers — the
@@ -28,16 +28,8 @@ export default async function NtePage({ searchParams }: PageProps) {
   const lastWeekStart = lastCompleteWeekStart(latest);
   const lastWeek = { start: lastWeekStart, end: addDays(lastWeekStart, 6) };
 
-  // Month shortcuts: every month with data, plus "All time" to find older NTEs
-  // that are still open.
-  const monthRanges = months.map((m) => {
-    const start = `${m}-01`;
-    const end = monthEnd(start);
-    return { label: formatPeriod(start, end), start, end };
-  });
-  const monthOptions = monthRanges.length
-    ? [{ label: 'All time', start: monthRanges[monthRanges.length - 1].start, end: monthRanges[0].end }, ...monthRanges]
-    : [];
+  // Month shortcuts, incl. "All time" to find older NTEs that are still open.
+  const monthOptions = buildMonthOptions(months);
 
   let start = isIsoDate(searchParams.start) ? searchParams.start : lastWeek.start;
   let end = isIsoDate(searchParams.end) ? searchParams.end : lastWeek.end;

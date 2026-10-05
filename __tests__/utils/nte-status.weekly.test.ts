@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { weekNeedsNte, computeWeeklyNteStatus } from '@/lib/utils/nte-status';
+import { weekNeedsNte, computeWeeklyNteStatus, rangeNteStatus } from '@/lib/utils/nte-status';
 
 // October walkthrough agreed with HR: monthly threshold, reviewed each week.
 describe('weekNeedsNte', () => {
@@ -42,5 +42,19 @@ describe('computeWeeklyNteStatus', () => {
     expect(computeWeeklyNteStatus(false, 4, 10, null)).toBe('warning');
     expect(computeWeeklyNteStatus(false, 1, 45, null)).toBe('warning');
     expect(computeWeeklyNteStatus(false, 3, 44, null)).toBe('safe');
+  });
+});
+
+describe('rangeNteStatus', () => {
+  it('shows the most urgent NTE in the range', () => {
+    expect(rangeNteStatus(['acknowledged', 'required', 'issued'], 0, 0)).toBe('required');
+    expect(rangeNteStatus(['acknowledged', 'issued'], 0, 0)).toBe('issued');
+    expect(rangeNteStatus(['acknowledged'], 9, 90)).toBe('acknowledged');
+  });
+
+  it('falls back to month-to-date when the range has no NTE', () => {
+    expect(rangeNteStatus([], 7, 50)).toBe('warning');
+    expect(rangeNteStatus([], 4, 10)).toBe('warning');
+    expect(rangeNteStatus([], 1, 10)).toBe('safe');
   });
 });

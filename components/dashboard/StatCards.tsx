@@ -13,19 +13,19 @@ export function StatCards({ nteRequired, approaching, totalIncidents, latePercen
       <div className="bg-white border border-border rounded-[7px] px-4 py-3.5">
         <p className="text-[11px] font-medium text-muted mb-1">NTE Required</p>
         <p className="text-[24px] font-bold text-nte-red leading-none tracking-tight">{nteRequired}</p>
-        <p className="text-[11px] text-muted mt-1">6+ lates or 60+ min this month, late this week</p>
+        <p className="text-[11px] text-muted mt-1">Open NTEs in this period</p>
       </div>
 
       <div className="bg-white border border-border rounded-[7px] px-4 py-3.5">
         <p className="text-[11px] font-medium text-muted mb-1">Approaching Threshold</p>
         <p className="text-[24px] font-bold text-amber-dark leading-none tracking-tight">{approaching}</p>
-        <p className="text-[11px] text-muted mt-1">4+ lates or 45+ min this month</p>
+        <p className="text-[11px] text-muted mt-1">4+ lates or 45+ min month-to-date</p>
       </div>
 
       <div className="bg-white border border-border rounded-[7px] px-4 py-3.5">
         <p className="text-[11px] font-medium text-muted mb-1">Total Late Incidents</p>
         <p className="text-[24px] font-bold text-app-text leading-none tracking-tight">{totalIncidents}</p>
-        <p className="text-[11px] text-muted mt-1">This week, all employees</p>
+        <p className="text-[11px] text-muted mt-1">In this period, all employees</p>
       </div>
 
       <div className="bg-white border border-border rounded-[7px] px-4 py-3.5">
