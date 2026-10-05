@@ -2,35 +2,42 @@ import { Suspense } from 'react';
 import { NteTable } from '@/components/nte/NteTable';
 import { NteFilterBar } from '@/components/nte/NteFilterBar';
 import { getSessionUser } from '@/lib/auth/session';
-import { getNteList, getNteFilterOptions, getNteCounts } from '@/lib/queries/nte';
+import { getNteList, getNteDepartments, getNteCounts } from '@/lib/queries/nte';
+import { getLatestAttendancePeriod } from '@/lib/queries/attendance';
+import { addDays, isIsoDate, lastCompleteWeekStart, monthEnd, todayPH } from '@/lib/utils/week';
 
 export const dynamic = 'force-dynamic';
 
 interface PageProps {
   searchParams: {
     status?: string;
-    year?: string;
-    month?: string; // just the month number "04", not "2026-04"
+    start?: string; // YYYY-MM-DD
+    end?: string;
     dept?: string;
   };
 }
 
 export default async function NtePage({ searchParams }: PageProps) {
-  const [filterOptions, user] = await Promise.all([getNteFilterOptions(), getSessionUser()]);
+  const [departments, latestPeriod, user] = await Promise.all([
+    getNteDepartments(), getLatestAttendancePeriod(), getSessionUser(),
+  ]);
 
-  // Derive defaults from the latest entry (already sorted DESC).
-  const [defaultYear, defaultMonthNum] = (filterOptions.months[0] || '').split('-');
-  const selectedYear = searchParams.year || defaultYear || '';
-  const selectedMonthNum = searchParams.month || defaultMonthNum || '';
-  const month = selectedYear && selectedMonthNum ? `${selectedYear}-${selectedMonthNum}` : '';
+  // Presets follow the uploaded data: "last week" is the latest Mon–Sun week it
+  // fully covers (the week reviewed on Monday); "this month" is its month.
+  const latest = latestPeriod?.latestDate ?? todayPH();
+  const lastWeekStart = lastCompleteWeekStart(latest);
+  const presets = {
+    lastWeek: { start: lastWeekStart, end: addDays(lastWeekStart, 6) },
+    thisMonth: { start: `${latest.slice(0, 7)}-01`, end: monthEnd(latest) },
+  };
+
+  let start = isIsoDate(searchParams.start) ? searchParams.start : presets.lastWeek.start;
+  let end = isIsoDate(searchParams.end) ? searchParams.end : presets.lastWeek.end;
+  if (start > end) [start, end] = [end, start];
 
   const [rows, counts] = await Promise.all([
-    getNteList({
-      status: searchParams.status,
-      month,
-      department: searchParams.dept,
-    }),
-    getNteCounts({ month, department: searchParams.dept }),
+    getNteList({ status: searchParams.status, start, end, department: searchParams.dept }),
+    getNteCounts({ start, end, department: searchParams.dept }),
   ]);
 
   const total = counts.required + counts.issued + counts.acknowledged;
@@ -41,15 +48,15 @@ export default async function NtePage({ searchParams }: PageProps) {
       <div className="bg-white border-b border-border flex-shrink-0">
         <div className="px-6 pt-4 pb-3">
           <h1 className="text-[15px] font-semibold text-app-text tracking-tight">NTE Management</h1>
-          <p className="text-[12px] text-muted mt-0.5">Employees who crossed the tardiness threshold. Admins issue and acknowledge NTE documents here.</p>
+          <p className="text-[12px] text-muted mt-0.5">Weekly NTEs (Mon–Sun) for employees at 6+ lates or 60+ min month-to-date who were late that week. Admins issue and acknowledge them here.</p>
         </div>
         <Suspense>
           <NteFilterBar
-            months={filterOptions.months}
-            departments={filterOptions.departments}
+            start={start}
+            end={end}
+            presets={presets}
+            departments={departments}
             selectedStatus={searchParams.status}
-            selectedYear={selectedYear}
-            selectedMonthNum={selectedMonthNum}
             selectedDept={searchParams.dept}
           />
         </Suspense>

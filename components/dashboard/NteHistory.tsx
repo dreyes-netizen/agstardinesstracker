@@ -3,17 +3,17 @@
 import { useEffect, useState } from 'react';
 import { getNteHistoryAction, type NteHistoryItem } from '@/app/nte/actions';
 
-// Inline NTE audit history for one employee + month, loaded on demand.
-export function NteHistory({ employeeId, month }: { employeeId: string; month: string }) {
+// Inline NTE audit history for one employee + period, loaded on demand.
+export function NteHistory({ employeeId, periodStart, periodEnd }: { employeeId: string; periodStart: string; periodEnd: string }) {
   const [items, setItems] = useState<NteHistoryItem[] | null>(null);
 
   useEffect(() => {
     let live = true;
-    getNteHistoryAction(employeeId, month)
+    getNteHistoryAction(employeeId, periodStart, periodEnd)
       .then((r) => { if (live) setItems(r); })
       .catch(() => { if (live) setItems([]); });
     return () => { live = false; };
-  }, [employeeId, month]);
+  }, [employeeId, periodStart, periodEnd]);
 
   if (!items || items.length === 0) return null;
 

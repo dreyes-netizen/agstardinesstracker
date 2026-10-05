@@ -24,7 +24,9 @@ export const nteAuditLog = pgTable('nte_audit_log', {
   id: serial('id').primaryKey(),
   nteRecordId: integer('nte_record_id'),
   employeeId: text('employee_id').notNull(),
-  month: text('month').notNull(),
+  month: text('month').notNull(),            // "2026-10" — grouping for the Audit Log filter
+  periodStart: date('period_start'),         // the NTE period the entry belongs to
+  periodEnd: date('period_end'),
   action: text('action').notNull(),          // 'issued' | 'acknowledged' | …
   actorEmail: text('actor_email').notNull(),
   actorRole: text('actor_role'),
@@ -98,10 +100,13 @@ export const lateAdjustments = pgTable('late_adjustments', {
   minutesNonNegative: check('late_adj_minutes_nonneg', sql`${t.adjustedMinutes} >= 0`),
 }));
 
+// One row per employee per NTE period: a Monday–Sunday week from WEEKLY_NTE_START
+// (lib/utils/week.ts) on, or a full calendar month for NTEs before it.
 export const nteRecords = pgTable('nte_records', {
   id: serial('id').primaryKey(),
   employeeId: text('employee_id').notNull().references(() => employees.employeeId),
-  month: text('month').notNull(),       // "2026-06"
+  periodStart: date('period_start').notNull(),
+  periodEnd: date('period_end').notNull(),
   status: text('status').notNull().default('required'), // 'required'|'issued'|'acknowledged'
   issuedDate: date('issued_date'),
   issuedBy: text('issued_by'),
@@ -110,7 +115,7 @@ export const nteRecords = pgTable('nte_records', {
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 }, (t) => ({
-  employeeMonthUniq: uniqueIndex('nte_employee_month_idx').on(t.employeeId, t.month),
+  employeePeriodUniq: uniqueIndex('nte_employee_period_idx').on(t.employeeId, t.periodStart, t.periodEnd),
 }));
 
 export const leaveRecords = pgTable('leave_records', {

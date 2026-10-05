@@ -5,11 +5,12 @@ import {
   useReactTable, getCoreRowModel, getSortedRowModel, getPaginationRowModel,
   flexRender, createColumnHelper, SortingState, PaginationState,
 } from '@tanstack/react-table';
-import { EmployeeMonthlyStats } from '@/lib/queries/attendance';
+import { EmployeeStats } from '@/lib/queries/attendance';
+import { addDays, formatPeriod } from '@/lib/utils/week';
 import { StatusBadge } from './StatusBadge';
 import { EmployeeDrawer } from './EmployeeDrawer';
 
-const col = createColumnHelper<EmployeeMonthlyStats>();
+const col = createColumnHelper<EmployeeStats>();
 
 const hide = { hideMobile: true };
 
@@ -40,7 +41,7 @@ const columns = [
     cell: (info) => <span className="text-muted text-[12px]">{info.getValue() ?? '—'}</span>,
   }),
   col.accessor('lateCount', {
-    header: () => <span className="block text-right">Late Count</span>,
+    header: () => <span className="block text-right">Week Lates</span>,
     cell: (info) => (
       <span className="font-mono text-[13px] block text-right">
         {info.getValue()} <span className="text-[10px] text-muted">×</span>
@@ -48,11 +49,22 @@ const columns = [
     ),
   }),
   col.accessor('accumulatedMinutes', {
-    header: () => <span className="block text-right">Accum. Min</span>,
+    header: () => <span className="block text-right">Week Min</span>,
     meta: hide,
     cell: (info) => (
       <span className="font-mono text-[13px] block text-right">
         {info.getValue()} <span className="text-[10px] text-muted">min</span>
+      </span>
+    ),
+  }),
+  col.accessor('mtdMinutes', {
+    id: 'mtd',
+    header: () => <span className="block text-right">Month to Date</span>,
+    meta: hide,
+    sortingFn: (a, b) => a.original.mtdLates - b.original.mtdLates || a.original.mtdMinutes - b.original.mtdMinutes,
+    cell: ({ row }) => (
+      <span className="font-mono text-[12px] text-muted block text-right whitespace-nowrap">
+        {row.original.mtdLates}<span className="text-[10px]">×</span> · {row.original.mtdMinutes}<span className="text-[10px]"> min</span>
       </span>
     ),
   }),
@@ -63,29 +75,26 @@ const columns = [
 ];
 
 interface EmployeeTableProps {
-  data: EmployeeMonthlyStats[];
-  year: number;
-  month: number;
+  data: EmployeeStats[];
+  weekStart: string;
   dept?: string;
   supervisor?: string;
   manager?: string;
   isAdmin: boolean;
 }
 
-const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-
 function escCsv(v: string | number | null | undefined): string {
   const s = v == null ? '' : String(v);
   return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
-export function EmployeeTable({ data, year, month, dept, supervisor, manager, isAdmin }: EmployeeTableProps) {
+export function EmployeeTable({ data, weekStart, dept, supervisor, manager, isAdmin }: EmployeeTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 50 });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // Looked up from fresh `data` so drawer totals update after router.refresh().
   const selected = useMemo(() => data.find((e) => e.employeeId === selectedId) ?? null, [data, selectedId]);
-  const setSelected = (e: EmployeeMonthlyStats | null) => setSelectedId(e?.employeeId ?? null);
+  const setSelected = (e: EmployeeStats | null) => setSelectedId(e?.employeeId ?? null);
   const [search, setSearch] = useState('');
   const [hideZero, setHideZero] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
@@ -106,7 +115,7 @@ export function EmployeeTable({ data, year, month, dept, supervisor, manager, is
   }, [data, search, hideZero, statusFilter]);
 
   function exportCsv() {
-    const periodLabel = `${MONTHS[month - 1]} ${year}`;
+    const periodLabel = formatPeriod(weekStart, addDays(weekStart, 6));
     const rows: string[][] = [
       ['Period', periodLabel],
       ['Department', dept || 'All'],
@@ -114,7 +123,7 @@ export function EmployeeTable({ data, year, month, dept, supervisor, manager, is
       ['Manager', manager || 'All'],
       ['Records exported', String(filtered.length)],
       [],
-      ['Employee ID', 'Last Name', 'First Name', 'Middle Name', 'Department', 'Supervisor', 'Manager', 'Late Count', 'Accumulated Minutes (min)', 'NTE Status'],
+      ['Employee ID', 'Last Name', 'First Name', 'Middle Name', 'Department', 'Supervisor', 'Manager', 'Week Lates', 'Week Minutes (min)', 'Month-to-date Lates', 'Month-to-date Minutes (min)', 'NTE Status'],
       ...filtered.map((e) => [
         e.employeeId,
         e.lastName,
@@ -125,6 +134,8 @@ export function EmployeeTable({ data, year, month, dept, supervisor, manager, is
         e.approver2 ?? '',
         String(e.lateCount),
         String(e.accumulatedMinutes),
+        String(e.mtdLates),
+        String(e.mtdMinutes),
         e.nteStatus,
       ]),
     ];
@@ -133,7 +144,7 @@ export function EmployeeTable({ data, year, month, dept, supervisor, manager, is
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `tardiness-${MONTHS[month - 1].toLowerCase()}-${year}.csv`;
+    a.download = `tardiness-week-${weekStart}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -248,7 +259,7 @@ export function EmployeeTable({ data, year, month, dept, supervisor, manager, is
               ))}
               {table.getRowModel().rows.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="text-center py-12 text-muted text-[13px]">
+                  <td colSpan={8} className="text-center py-12 text-muted text-[13px]">
                     {data.length === 0
                       ? 'No employees found. Upload an attendance report to get started.'
                       : 'No employees match your search or filters.'}
@@ -281,8 +292,8 @@ export function EmployeeTable({ data, year, month, dept, supervisor, manager, is
 
       <EmployeeDrawer
         employee={selected}
-        year={year}
-        month={month}
+        periodStart={weekStart}
+        periodEnd={addDays(weekStart, 6)}
         isAdmin={isAdmin}
         onClose={() => setSelected(null)}
         onNteAction={() => setSelected(null)}

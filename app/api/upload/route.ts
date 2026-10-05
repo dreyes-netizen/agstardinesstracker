@@ -5,19 +5,8 @@ import { parseLeaveSheet } from '@/lib/parsers/leave';
 import { replaceRoster, getRosterEmployeeIds } from '@/lib/queries/employees';
 import { replaceAttendancePeriod, recordUpload } from '@/lib/queries/attendance';
 import { replaceLeaveFromReport } from '@/lib/queries/leave';
-import { syncNteForMonth } from '@/lib/queries/nte';
+import { syncNteRequired } from '@/lib/queries/nte';
 import { getSessionUser } from '@/lib/auth/session';
-
-function getMonthsInRange(start: string, end: string): string[] {
-  const months = new Set<string>();
-  const current = new Date(start + 'T00:00:00');
-  const endDate = new Date(end + 'T00:00:00');
-  while (current <= endDate) {
-    months.add(current.toISOString().substring(0, 7));
-    current.setMonth(current.getMonth() + 1);
-  }
-  return Array.from(months);
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -73,8 +62,7 @@ export async function POST(req: NextRequest) {
       );
       await recordUpload(attendanceFile.name, result.periodStart, result.periodEnd, count);
 
-      const months = getMonthsInRange(result.periodStart, result.periodEnd);
-      await Promise.all(months.map((m) => syncNteForMonth(m)));
+      await syncNteRequired();
 
       const skipped = result.records.length - filteredRecords.length;
       attendanceSummary = {

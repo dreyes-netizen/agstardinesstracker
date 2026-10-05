@@ -17,6 +17,8 @@ export default async function AuditPage() {
     employeeId: String(r.employee_id),
     name: [r.last_name, r.first_name].filter(Boolean).join(', ') || String(r.employee_id),
     month: String(r.month),
+    periodStart: r.period_start ? String(r.period_start) : '',
+    periodEnd: r.period_end ? String(r.period_end) : '',
     details: r.details ? String(r.details) : '',
   }));
 

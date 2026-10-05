@@ -16,8 +16,7 @@ interface LeaveFilters {
 }
 
 interface DashboardFilters {
-  year: string;
-  month: string;
+  week: string;
   dept: string;
   supervisor: string;
   manager: string;

@@ -3,15 +3,16 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
-import type { EmployeeMonthlyStats, EmployeeLateRecord } from '@/lib/queries/attendance';
+import type { EmployeeStats, EmployeeLateRecord } from '@/lib/queries/attendance';
 import { NteForm } from './NteForm';
 import { LateAdjustForm } from './LateAdjustForm';
 import { formatDate } from '@/lib/utils/date';
+import { formatPeriod } from '@/lib/utils/week';
 
 interface EmployeeDrawerProps {
-  employee: EmployeeMonthlyStats | null;
-  year: number;
-  month: number;
+  employee: EmployeeStats | null;
+  periodStart: string;
+  periodEnd: string;
   isAdmin?: boolean;
   onClose: () => void;
   onNteAction: () => void;
@@ -22,7 +23,7 @@ function getDay(dateStr: string) {
   return DAY_NAMES[new Date(dateStr + 'T00:00:00').getDay()];
 }
 
-export function EmployeeDrawer({ employee, year, month, isAdmin = false, onClose, onNteAction }: EmployeeDrawerProps) {
+export function EmployeeDrawer({ employee, periodStart, periodEnd, isAdmin = false, onClose, onNteAction }: EmployeeDrawerProps) {
   const router = useRouter();
   const [lateRecords, setLateRecords] = useState<EmployeeLateRecord[]>([]);
   const [loading, setLoading] = useState(false);
@@ -30,7 +31,6 @@ export function EmployeeDrawer({ employee, year, month, isAdmin = false, onClose
   const [editingDate, setEditingDate] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
-  const monthStr = `${year}-${String(month).padStart(2, '0')}`;
 
   function handleAdjusted() {
     setEditingDate(null);
@@ -46,7 +46,7 @@ export function EmployeeDrawer({ employee, year, month, isAdmin = false, onClose
     abortRef.current = controller;
     setLoading(true);
     setFetchError(false);
-    fetch(`/api/employee/${employee.employeeId}/lates?year=${year}&month=${month}`, { signal: controller.signal })
+    fetch(`/api/employee/${employee.employeeId}/lates?start=${periodStart}&end=${periodEnd}`, { signal: controller.signal })
       .then((r) => r.json())
       .then((data: EmployeeLateRecord[]) => setLateRecords(data))
       .catch((err) => { if (err.name !== 'AbortError') setFetchError(true); })
@@ -54,7 +54,7 @@ export function EmployeeDrawer({ employee, year, month, isAdmin = false, onClose
     return () => controller.abort();
     // Keyed on employeeId (not the whole employee object) intentionally.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [employee?.employeeId, year, month, reloadKey]);
+  }, [employee?.employeeId, periodStart, periodEnd, reloadKey]);
 
   if (!employee) return null;
 
@@ -82,7 +82,7 @@ export function EmployeeDrawer({ employee, year, month, isAdmin = false, onClose
         <div className="flex-1 overflow-y-auto">
           <div className="px-[22px] py-4 border-b border-border">
             <p className="text-[11px] font-semibold text-muted mb-3">
-              {new Date(`${monthStr}-01`).toLocaleDateString('en-PH', { month: 'long', year: 'numeric' })} — Totals
+              {formatPeriod(periodStart, periodEnd)} — Totals
             </p>
             <div className="flex gap-4">
               <div className="flex-1 bg-ground rounded-[5px] px-3.5 py-3">
@@ -94,6 +94,10 @@ export function EmployeeDrawer({ employee, year, month, isAdmin = false, onClose
                 <p className="text-[11px] text-muted mt-1">Minutes accumulated</p>
               </div>
             </div>
+            <p className="text-[11.5px] text-muted mt-2.5">
+              Month to date: <span className="font-mono font-medium text-app-text">{employee.mtdLates}× · {employee.mtdMinutes} min</span>
+              <span className="text-muted/80"> (NTE at 6 lates or 60 min)</span>
+            </p>
           </div>
 
           <div className="px-[22px] py-4 border-b border-border">
@@ -111,7 +115,7 @@ export function EmployeeDrawer({ employee, year, month, isAdmin = false, onClose
             ) : fetchError ? (
               <p className="text-[12.5px] text-nte-red">Failed to load records. Please close and reopen.</p>
             ) : lateRecords.length === 0 ? (
-              <p className="text-[12.5px] text-muted">No late records for this month.</p>
+              <p className="text-[12.5px] text-muted">No late records for this period.</p>
             ) : (
               <table className="w-full">
                 <thead>
@@ -191,7 +195,8 @@ export function EmployeeDrawer({ employee, year, month, isAdmin = false, onClose
               <p className="text-[11px] font-semibold text-muted mb-3">NTE Action</p>
               <NteForm
                 employeeId={employee.employeeId}
-                month={monthStr}
+                periodStart={periodStart}
+                periodEnd={periodEnd}
                 nteStatus={employee.nteStatus}
                 issuedDate={employee.issuedDate}
                 issuedBy={employee.issuedBy}

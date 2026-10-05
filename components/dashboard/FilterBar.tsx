@@ -3,6 +3,7 @@
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { formatDate } from '@/lib/utils/date';
+import { addDays, formatPeriod, weekStart as toWeekStart } from '@/lib/utils/week';
 import { useFilterContext } from '@/context/FilterContext';
 
 interface Combination {
@@ -12,8 +13,7 @@ interface Combination {
 }
 
 interface FilterBarProps {
-  year: number;
-  month: number;
+  weekStart: string; // Monday, YYYY-MM-DD
   departments: string[];
   supervisors: string[];
   managers: string[];
@@ -24,28 +24,15 @@ interface FilterBarProps {
   latestDate?: string | null;
 }
 
-const MONTHS = [
-  { value: 1,  label: 'January' },
-  { value: 2,  label: 'February' },
-  { value: 3,  label: 'March' },
-  { value: 4,  label: 'April' },
-  { value: 5,  label: 'May' },
-  { value: 6,  label: 'June' },
-  { value: 7,  label: 'July' },
-  { value: 8,  label: 'August' },
-  { value: 9,  label: 'September' },
-  { value: 10, label: 'October' },
-  { value: 11, label: 'November' },
-  { value: 12, label: 'December' },
-];
-
 const SELECT_CLS =
   'bg-ground border border-border rounded-[5px] px-2.5 py-1.5 text-[12.5px] text-app-text focus:outline-none focus-visible:ring-2 focus-visible:ring-app-blue/40 min-w-0';
 const LABEL_CLS =
   'text-[12.5px] text-muted';
+const NAV_BTN_CLS =
+  'border border-border rounded-[5px] w-7 h-[30px] text-[15px] leading-none text-muted hover:text-app-text hover:border-app-text/30 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-app-blue/40';
 
 export function FilterBar({
-  year, month, departments, supervisors, managers, combinations,
+  weekStart, departments, supervisors, managers, combinations,
   selectedDept, selectedSupervisor, selectedManager, latestDate,
 }: FilterBarProps) {
   const router = useRouter();
@@ -57,10 +44,9 @@ export function FilterBar({
   // Restore saved filters whenever the URL has no params (covers both initial mount
   // and clicking the nav button again while already on this page).
   useEffect(() => {
-    if (!searchParams.get('year') && savedDashboard) {
+    if (!searchParams.get('week') && savedDashboard) {
       const params = new URLSearchParams();
-      params.set('year', savedDashboard.year);
-      params.set('month', savedDashboard.month);
+      params.set('week', savedDashboard.week);
       if (savedDashboard.dept) params.set('dept', savedDashboard.dept);
       if (savedDashboard.supervisor) params.set('supervisor', savedDashboard.supervisor);
       if (savedDashboard.manager) params.set('manager', savedDashboard.manager);
@@ -72,13 +58,12 @@ export function FilterBar({
   const pushAndSave = useCallback((params: URLSearchParams) => {
     router.push(`${pathname}?${params.toString()}`);
     setDashboard({
-      year: params.get('year') || String(year),
-      month: params.get('month') || String(month),
+      week: params.get('week') || weekStart,
       dept: params.get('dept') || '',
       supervisor: params.get('supervisor') || '',
       manager: params.get('manager') || '',
     });
-  }, [router, pathname, year, month, setDashboard]);
+  }, [router, pathname, weekStart, setDashboard]);
 
   // Cascade: when a dept is selected, narrow supervisors and managers to those
   // who appear in at least one employee row in that department.
@@ -133,32 +118,19 @@ export function FilterBar({
     [searchParams, combinations, selectedSupervisor, selectedManager, pushAndSave],
   );
 
-  const handleYearChange = (value: string) => {
+  const setWeek = (date: string) => {
+    if (!date) return;
     const params = new URLSearchParams(searchParams.toString());
-    params.set('year', value);
-    params.set('month', String(month));
+    params.set('week', toWeekStart(date));
     pushAndSave(params);
   };
-
-  const handleMonthChange = (value: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set('year', String(year));
-    params.set('month', value);
-    pushAndSave(params);
-  };
-
-  const currentYear = new Date().getFullYear();
-  const years: number[] = [];
-  for (let y = currentYear + 1; y >= 2024; y--) years.push(y);
-
-  const monthLabel = MONTHS.find((m) => m.value === month)?.label ?? '';
 
   const latestDateLabel = latestDate ? formatDate(latestDate) : null;
 
   return (
     <div className="bg-white border-b border-border px-4 md:px-6 py-3 flex items-center gap-4 md:gap-6 flex-wrap">
       <h1 className="text-[15px] font-semibold text-app-text tracking-tight mr-2">
-        {monthLabel} {year}
+        {formatPeriod(weekStart, addDays(weekStart, 6))}
       </h1>
       {latestDateLabel && (
         <span className="hidden md:inline text-[11.5px] text-muted ml-auto">
@@ -174,30 +146,21 @@ export function FilterBar({
       </button>
 
       <div className={`${filtersOpen ? 'flex flex-wrap gap-x-4 gap-y-2 w-full' : 'hidden'} md:contents`}>
-      <div className="flex items-center gap-2">
-        <span className={LABEL_CLS}>Month</span>
-        <select
-          value={month}
-          onChange={(e) => handleMonthChange(e.target.value)}
+      <div className="flex items-center gap-1.5">
+        <span className={`${LABEL_CLS} mr-0.5`}>Week</span>
+        <button type="button" onClick={() => setWeek(addDays(weekStart, -7))} aria-label="Previous week" className={NAV_BTN_CLS}>
+          ‹
+        </button>
+        <input
+          type="date"
+          value={weekStart}
+          onChange={(e) => setWeek(e.target.value)}
+          aria-label="Pick any day in the week"
           className={SELECT_CLS}
-        >
-          {MONTHS.map((m) => (
-            <option key={m.value} value={m.value}>{m.label}</option>
-          ))}
-        </select>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <span className={LABEL_CLS}>Year</span>
-        <select
-          value={year}
-          onChange={(e) => handleYearChange(e.target.value)}
-          className={SELECT_CLS}
-        >
-          {years.map((y) => (
-            <option key={y} value={y}>{y}</option>
-          ))}
-        </select>
+        />
+        <button type="button" onClick={() => setWeek(addDays(weekStart, 7))} aria-label="Next week" className={NAV_BTN_CLS}>
+          ›
+        </button>
       </div>
 
       <div className="flex items-center gap-2">
