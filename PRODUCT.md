@@ -8,7 +8,7 @@ product
 
 HR managers, supervisors, and team leads at Alliance Global Solutions (AGS). Internal use only — accessed on desktop at the office. Users are task-oriented: they need to quickly see who is late, how often, and act on it. They are not designers and will not tolerate a confusing interface.
 
-## Product Purposes
+## Product Purpose
 
 The AGS Tardiness Tracker ingests Sprout HR attendance exports, identifies employees who have crossed the tardiness threshold (6+ lates or 60+ accumulated minutes per month), and manages the full NTE (Notice to Explain) lifecycle from issuance to acknowledgment. Success means: a supervisor uploads a report, immediately sees who needs action, and issues an NTE in under a minute.
 
