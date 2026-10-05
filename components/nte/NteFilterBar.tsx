@@ -1,25 +1,27 @@
 'use client';
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
+
+interface Range {
+  start: string;
+  end: string;
+}
 
 interface NteFilterBarProps {
-  months: string[]; // YYYY-MM strings from the DB, sorted DESC
+  start: string;
+  end: string;
+  presets: { lastWeek: Range; thisMonth: Range };
   departments: string[];
   selectedStatus?: string;
-  selectedYear?: string;
-  selectedMonthNum?: string; // "04", not "2026-04"
   selectedDept?: string;
 }
 
 const SELECT_CLS =
   'bg-ground border border-border rounded-[5px] px-2.5 py-1.5 text-[12.5px] text-app-text focus:outline-none focus-visible:ring-2 focus-visible:ring-app-blue/40 min-w-0 w-full md:w-auto';
 const LABEL_CLS = 'text-[12.5px] text-muted';
-
-const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
+const PRESET_CLS =
+  'px-2.5 py-1.5 rounded-[5px] border text-[11.5px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-app-blue/40';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All Statuses' },
@@ -28,52 +30,59 @@ const STATUS_OPTIONS = [
   { value: 'acknowledged', label: 'Acknowledged' },
 ];
 
-export function NteFilterBar({ months, departments, selectedStatus, selectedYear, selectedMonthNum, selectedDept }: NteFilterBarProps) {
+export function NteFilterBar({ start, end, presets, departments, selectedStatus, selectedDept }: NteFilterBarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // Derive unique years and the months available for the selected year.
-  const years = useMemo(
-    () => Array.from(new Set(months.map((m) => m.split('-')[0]))).sort((a, b) => Number(b) - Number(a)),
-    [months],
-  );
-
-  const availableMonthNums = useMemo(
-    () => months
-      .filter((m) => m.startsWith(selectedYear ?? ''))
-      .map((m) => m.split('-')[1]),
-    [months, selectedYear],
-  );
-
-  const updateParam = useCallback(
-    (key: string, value: string) => {
+  const pushParams = useCallback(
+    (mut: (p: URLSearchParams) => void) => {
       const params = new URLSearchParams(searchParams.toString());
-      if (value) params.set(key, value);
-      else params.delete(key);
+      mut(params);
       router.push(`${pathname}?${params.toString()}`);
     },
     [router, pathname, searchParams],
   );
 
-  // When the year changes, also reset month to the latest available for that year.
-  const handleYearChange = useCallback(
-    (year: string) => {
-      const params = new URLSearchParams(searchParams.toString());
-      params.set('year', year);
-      const latestMonthForYear = months.find((m) => m.startsWith(year))?.split('-')[1] ?? '';
-      if (latestMonthForYear) params.set('month', latestMonthForYear);
-      else params.delete('month');
-      router.push(`${pathname}?${params.toString()}`);
-    },
-    [router, pathname, searchParams, months],
+  const updateParam = useCallback(
+    (key: string, value: string) => pushParams((p) => (value ? p.set(key, value) : p.delete(key))),
+    [pushParams],
   );
 
-  // Year/month are always set (defaulted on server), so only status/dept count as active.
+  const setRange = useCallback(
+    (r: Range) => pushParams((p) => { p.set('start', r.start); p.set('end', r.end); }),
+    [pushParams],
+  );
+
+  const isRange = (r: Range) => r.start === start && r.end === end;
+
+  // The range is always set (defaulted on server), so only status/dept count as active.
   const hasFilters = !!(selectedStatus || selectedDept);
 
   return (
     <div className="px-4 md:px-6 pb-3 grid grid-cols-2 gap-2 md:flex md:items-center md:gap-6 md:flex-wrap">
+      <div className="col-span-2 flex items-center gap-2 flex-wrap">
+        <span className={LABEL_CLS}>From</span>
+        <input type="date" value={start} max={end}
+          onChange={(e) => e.target.value && updateParam('start', e.target.value)} className={SELECT_CLS} />
+        <span className={LABEL_CLS}>To</span>
+        <input type="date" value={end} min={start}
+          onChange={(e) => e.target.value && updateParam('end', e.target.value)} className={SELECT_CLS} />
+        {([['Last week', presets.lastWeek], ['This month', presets.thisMonth]] as const).map(([label, r]) => (
+          <button
+            key={label}
+            type="button"
+            onClick={() => setRange(r)}
+            aria-pressed={isRange(r)}
+            className={`${PRESET_CLS} ${isRange(r)
+              ? 'bg-app-blue/10 border-app-blue/30 text-app-blue font-medium'
+              : 'border-border text-muted hover:text-app-text'}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       <div className="flex items-center gap-2">
         <span className={LABEL_CLS}>Status</span>
         <select
@@ -86,36 +95,6 @@ export function NteFilterBar({ months, departments, selectedStatus, selectedYear
           ))}
         </select>
       </div>
-
-      {years.length > 0 && (
-        <div className="flex items-center gap-2">
-          <span className={LABEL_CLS}>Year</span>
-          <select
-            value={selectedYear ?? ''}
-            onChange={(e) => handleYearChange(e.target.value)}
-            className={SELECT_CLS}
-          >
-            {years.map((y) => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      {availableMonthNums.length > 0 && (
-        <div className="flex items-center gap-2">
-          <span className={LABEL_CLS}>Month</span>
-          <select
-            value={selectedMonthNum ?? ''}
-            onChange={(e) => updateParam('month', e.target.value)}
-            className={SELECT_CLS}
-          >
-            {availableMonthNums.map((m) => (
-              <option key={m} value={m}>{MONTH_NAMES[Number(m) - 1]}</option>
-            ))}
-          </select>
-        </div>
-      )}
 
       {departments.length > 0 && (
         <div className="flex items-center gap-2">
@@ -135,7 +114,7 @@ export function NteFilterBar({ months, departments, selectedStatus, selectedYear
 
       {hasFilters && (
         <button
-          onClick={() => router.push(pathname)}
+          onClick={() => pushParams((p) => { p.delete('status'); p.delete('dept'); })}
           className="text-[12px] text-muted hover:text-app-text transition-colors ml-auto"
         >
           Clear filters

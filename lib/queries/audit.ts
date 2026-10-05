@@ -5,7 +5,9 @@ import { and, desc, eq, sql, SQL } from 'drizzle-orm';
 export interface NteAuditInput {
   nteRecordId?: number | null;
   employeeId: string;
-  month: string;
+  periodStart: string;
+  periodEnd: string;
+  month?: string;          // defaults to the month the period ends in
   action: string;          // 'issued' | 'acknowledged' | …
   actorEmail: string;
   actorRole?: string | null;
@@ -17,7 +19,9 @@ export async function addNteAuditEntry(e: NteAuditInput) {
   await db.insert(nteAuditLog).values({
     nteRecordId: e.nteRecordId ?? null,
     employeeId: e.employeeId,
-    month: e.month,
+    month: e.month ?? e.periodEnd.slice(0, 7),
+    periodStart: e.periodStart,
+    periodEnd: e.periodEnd,
     action: e.action,
     actorEmail: e.actorEmail,
     actorRole: e.actorRole ?? null,
@@ -25,12 +29,16 @@ export async function addNteAuditEntry(e: NteAuditInput) {
   });
 }
 
-// Inline history for one NTE (employee + month), newest first.
-export async function getNteAuditForEmployeeMonth(employeeId: string, month: string) {
+// Inline history for one NTE (employee + period), newest first.
+export async function getNteAuditForPeriod(employeeId: string, periodStart: string, periodEnd: string) {
   return db
     .select()
     .from(nteAuditLog)
-    .where(and(eq(nteAuditLog.employeeId, employeeId), eq(nteAuditLog.month, month)))
+    .where(and(
+      eq(nteAuditLog.employeeId, employeeId),
+      eq(nteAuditLog.periodStart, periodStart),
+      eq(nteAuditLog.periodEnd, periodEnd),
+    ))
     .orderBy(desc(nteAuditLog.createdAt));
 }
 
@@ -51,7 +59,7 @@ export async function getNteAuditLog(filters: AuditLogFilters = {}) {
   const rows = await db.execute(sql`
     SELECT
       l.id, l.created_at, l.action, l.actor_email, l.actor_role,
-      l.employee_id, l.month, l.details,
+      l.employee_id, l.month, l.period_start::text AS period_start, l.period_end::text AS period_end, l.details,
       e.first_name, e.last_name
     FROM nte_audit_log l
     LEFT JOIN employees e ON e.employee_id = l.employee_id

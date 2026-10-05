@@ -5,12 +5,12 @@ import { DayOfWeekCards } from '@/components/dashboard/DayOfWeekCards';
 import { EmployeeTable } from '@/components/dashboard/EmployeeTable';
 import { getFilterOptions } from '@/lib/queries/employees';
 import { getSessionUser } from '@/lib/auth/session';
-import { getMonthlyStats, hasAttendanceData, getLatestAttendancePeriod, getLateByDayOfWeek } from '@/lib/queries/attendance';
+import { getWeeklyStats, hasAttendanceInRange, getLatestAttendancePeriod, getLateByDayOfWeek } from '@/lib/queries/attendance';
+import { addDays, formatPeriod, isIsoDate, lastCompleteWeekStart, todayPH, weekStart as toWeekStart } from '@/lib/utils/week';
 
 interface PageProps {
   searchParams: {
-    year?: string;
-    month?: string;
+    week?: string; // any date in the week; snapped to its Monday
     dept?: string;
     supervisor?: string;
     manager?: string;
@@ -18,8 +18,6 @@ interface PageProps {
 }
 
 export default async function DashboardPage({ searchParams }: PageProps) {
-  const now = new Date();
-  const hasParams = !!(searchParams.year && searchParams.month);
   const dept = searchParams.dept;
   const supervisor = searchParams.supervisor;
   const manager = searchParams.manager;
@@ -32,15 +30,19 @@ export default async function DashboardPage({ searchParams }: PageProps) {
     getSessionUser(),
   ]);
 
-  const year  = Number(searchParams.year)  || latestPeriod?.year  || now.getFullYear();
-  const month = Number(searchParams.month) || latestPeriod?.month || (now.getMonth() + 1);
+  // Default: the last Mon–Sun week fully covered by uploaded data — the week
+  // reviewed on Monday.
+  const weekStart = isIsoDate(searchParams.week)
+    ? toWeekStart(searchParams.week)
+    : lastCompleteWeekStart(latestPeriod?.latestDate ?? todayPH());
+  const weekEnd = addDays(weekStart, 6);
 
-  const filters = { year, month, department: dept, immediateSupervisor: supervisor, approver2: manager };
+  const filters = { weekStart, department: dept, immediateSupervisor: supervisor, approver2: manager };
 
-  // Round 2: data queries, now that year/month is resolved.
+  // Round 2: data queries, now that the week is resolved.
   const [dataExists, employees, dowStats] = await Promise.all([
-    hasAttendanceData(year, month),
-    getMonthlyStats(filters),
+    hasAttendanceInRange(weekStart, weekEnd),
+    getWeeklyStats(filters),
     getLateByDayOfWeek(filters),
   ]);
 
@@ -52,13 +54,13 @@ export default async function DashboardPage({ searchParams }: PageProps) {
     ? Math.round((lateCount / employees.length) * 100)
     : 0;
 
-  const monthLabel = new Date(year, month - 1).toLocaleString('en-US', { month: 'long', year: 'numeric' });
+  const weekLabel = formatPeriod(weekStart, weekEnd);
 
   return (
     <div className="flex flex-col h-full">
       <Suspense>
         <FilterBar
-          year={year} month={month}
+          weekStart={weekStart}
           departments={filterOptions.departments}
           supervisors={filterOptions.supervisors}
           managers={filterOptions.managers}
@@ -84,11 +86,11 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           </div>
         )}
         {dataExists ? (
-          <EmployeeTable data={employees} year={year} month={month} dept={dept} supervisor={supervisor} manager={manager} isAdmin={user?.role === 'admin'} />
+          <EmployeeTable data={employees} weekStart={weekStart} dept={dept} supervisor={supervisor} manager={manager} isAdmin={user?.role === 'admin'} />
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-center">
-            <p className="text-[15px] font-medium text-app-text">No attendance data for {monthLabel}</p>
-            <p className="text-[13px] text-muted mt-1">Upload an attendance report for this period to see results.</p>
+            <p className="text-[15px] font-medium text-app-text">No attendance data for {weekLabel}</p>
+            <p className="text-[13px] text-muted mt-1">Upload an attendance report covering this week to see results.</p>
           </div>
         )}
       </div>

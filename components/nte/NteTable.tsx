@@ -7,9 +7,10 @@ import { EmployeeDrawer } from '@/components/dashboard/EmployeeDrawer';
 import { issueNteAction, acknowledgeNteAction } from '@/app/nte/actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { EmployeeMonthlyStats } from '@/lib/queries/attendance';
+import { EmployeeStats } from '@/lib/queries/attendance';
 import { NteStatus } from '@/lib/utils/nte-status';
 import { formatDate } from '@/lib/utils/date';
+import { formatPeriod } from '@/lib/utils/week';
 
 interface NteRow {
   id: number;
@@ -20,7 +21,8 @@ interface NteRow {
   department: string | null;
   immediate_supervisor: string | null;
   approver2: string | null;
-  month: string;
+  period_start: string;
+  period_end: string;
   status: string;
   issued_date: string | null;
   issued_by: string | null;
@@ -28,11 +30,13 @@ interface NteRow {
   acknowledged_date: string | null;
   late_count: number;
   accumulated_minutes: number;
+  mtd_lates: number;
+  mtd_minutes: number;
 }
 
 const fmtDate = formatDate;
 
-function rowToStats(row: NteRow): EmployeeMonthlyStats {
+function rowToStats(row: NteRow): EmployeeStats {
   return {
     employeeId: row.employee_id,
     firstName: row.first_name,
@@ -43,6 +47,8 @@ function rowToStats(row: NteRow): EmployeeMonthlyStats {
     approver2: row.approver2,
     lateCount: row.late_count,
     accumulatedMinutes: row.accumulated_minutes,
+    mtdLates: row.mtd_lates,
+    mtdMinutes: row.mtd_minutes,
     nteStatus: row.status as NteStatus,
     nteRecordId: row.id,
     issuedDate: row.issued_date,
@@ -53,10 +59,10 @@ function rowToStats(row: NteRow): EmployeeMonthlyStats {
 
 export function NteTable({ rows, isAdmin }: { rows: NteRow[]; isAdmin: boolean }) {
   const router = useRouter();
-  const [issueForm, setIssueForm] = useState<{ employeeId: string; month: string } | null>(null);
+  const [issueFormId, setIssueFormId] = useState<number | null>(null);
   const [notes, setNotes] = useState('');
   const [issueLoading, setIssueLoading] = useState(false);
-  const [ackLoadingId, setAckLoadingId] = useState<string | null>(null);
+  const [ackLoadingId, setAckLoadingId] = useState<number | null>(null);
   const [selected, setSelected] = useState<NteRow | null>(null);
   const [search, setSearch] = useState('');
 
@@ -70,28 +76,22 @@ export function NteTable({ rows, isAdmin }: { rows: NteRow[]; isAdmin: boolean }
     });
   }, [rows, search]);
 
-  async function handleIssue(e: React.FormEvent) {
+  async function handleIssue(e: React.FormEvent, row: NteRow) {
     e.preventDefault();
-    if (!issueForm) return;
     setIssueLoading(true);
-    await issueNteAction(issueForm.employeeId, issueForm.month, notes);
-    setIssueForm(null);
+    await issueNteAction(row.employee_id, row.period_start, row.period_end, notes);
+    setIssueFormId(null);
     setNotes('');
     setIssueLoading(false);
     router.refresh();
   }
 
-  async function handleAcknowledge(employeeId: string, month: string) {
-    const id = `${employeeId}-${month}`;
-    setAckLoadingId(id);
-    await acknowledgeNteAction(employeeId, month);
+  async function handleAcknowledge(row: NteRow) {
+    setAckLoadingId(row.id);
+    await acknowledgeNteAction(row.employee_id, row.period_start, row.period_end);
     setAckLoadingId(null);
     router.refresh();
   }
-
-  const drawerMonth = selected ? selected.month.split('-').map(Number) : [0, 0];
-  const drawerYear = drawerMonth[0];
-  const drawerMonthNum = drawerMonth[1];
 
   return (
     <>
@@ -121,11 +121,12 @@ export function NteTable({ rows, isAdmin }: { rows: NteRow[]; isAdmin: boolean }
             <tr className="border-b border-border">
               {[
                 { h: 'Employee', extra: '' },
-                { h: 'Month', extra: '' },
+                { h: 'Period', extra: '' },
                 { h: 'Department', extra: ' hidden md:table-cell' },
                 { h: 'Supervisor', extra: ' hidden md:table-cell' },
-                { h: 'Late Count', extra: ' hidden md:table-cell' },
-                { h: 'Accum. Min', extra: ' hidden md:table-cell' },
+                { h: 'Lates', extra: ' hidden md:table-cell' },
+                { h: 'Late Min', extra: ' hidden md:table-cell' },
+                { h: 'Month to Date', extra: ' hidden lg:table-cell' },
                 { h: 'Status', extra: '' },
                 { h: 'Issued By / Action', extra: '' },
               ].map(({ h, extra }) => (
@@ -135,7 +136,7 @@ export function NteTable({ rows, isAdmin }: { rows: NteRow[]; isAdmin: boolean }
           </thead>
           <tbody>
             {filtered.map((row) => (
-              <Fragment key={`${row.employee_id}-${row.month}`}>
+              <Fragment key={row.id}>
                 <tr className={`border-b border-row-border hover:bg-row-alt ${row.status === 'acknowledged' ? 'opacity-60' : ''}`}>
                   <td className="px-4 py-3 first:pl-5">
                     <button
@@ -147,19 +148,20 @@ export function NteTable({ rows, isAdmin }: { rows: NteRow[]; isAdmin: boolean }
                     </button>
                   </td>
                   <td className="px-4 py-3 text-[12px] text-app-text whitespace-nowrap">
-                  {new Date(row.month + '-01T00:00:00').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                  {formatPeriod(row.period_start, row.period_end)}
                 </td>
                   <td className="px-4 py-3 text-[12px] text-muted hidden md:table-cell">{row.department ?? '—'}</td>
                   <td className="px-4 py-3 text-[12px] text-muted hidden md:table-cell">{row.immediate_supervisor ?? '—'}</td>
                   <td className="px-4 py-3 font-mono text-[13px] text-right hidden md:table-cell">{row.late_count} <span className="text-[10px] text-muted">×</span></td>
                   <td className="px-4 py-3 font-mono text-[13px] text-right hidden md:table-cell">{row.accumulated_minutes} <span className="text-[10px] text-muted">min</span></td>
+                  <td className="px-4 py-3 font-mono text-[12px] text-muted text-right whitespace-nowrap hidden lg:table-cell">{row.mtd_lates}<span className="text-[10px]">×</span> · {row.mtd_minutes}<span className="text-[10px]"> min</span></td>
                   <td className="px-4 py-3"><StatusBadge status={row.status as 'required' | 'issued' | 'acknowledged'} /></td>
                   <td className="px-4 py-3 pr-5">
                     {row.status === 'required' && !isAdmin && (
                       <span className="text-[11px] text-muted">Awaiting admin</span>
                     )}
                     {row.status === 'required' && isAdmin && (
-                      <Button size="sm" variant="outline" className="text-[11px] border-nte-red/30 text-nte-red hover:bg-nte-red/5 h-7 px-3" onClick={() => setIssueForm({ employeeId: row.employee_id, month: row.month })}>
+                      <Button size="sm" variant="outline" className="text-[11px] border-nte-red/30 text-nte-red hover:bg-nte-red/5 h-7 px-3" onClick={() => setIssueFormId(row.id)}>
                         Issue NTE
                       </Button>
                     )}
@@ -170,8 +172,8 @@ export function NteTable({ rows, isAdmin }: { rows: NteRow[]; isAdmin: boolean }
                           {row.issued_by && <> by <span className="font-medium text-app-text">{row.issued_by}</span></>}
                         </div>
                         {row.notes && <div className="text-[11px] text-muted italic">&ldquo;{row.notes}&rdquo;</div>}
-                        {isAdmin && <Button size="sm" variant="outline" disabled={ackLoadingId === `${row.employee_id}-${row.month}`} className="text-[11px] border-safe-green/30 text-safe-green hover:bg-safe-green/5 h-7 px-3" onClick={() => handleAcknowledge(row.employee_id, row.month)}>
-                          {ackLoadingId === `${row.employee_id}-${row.month}` ? 'Saving…' : 'Mark Acknowledged'}
+                        {isAdmin && <Button size="sm" variant="outline" disabled={ackLoadingId === row.id} className="text-[11px] border-safe-green/30 text-safe-green hover:bg-safe-green/5 h-7 px-3" onClick={() => handleAcknowledge(row)}>
+                          {ackLoadingId === row.id ? 'Saving…' : 'Mark Acknowledged'}
                         </Button>}
                       </div>
                     )}
@@ -188,10 +190,10 @@ export function NteTable({ rows, isAdmin }: { rows: NteRow[]; isAdmin: boolean }
                     )}
                   </td>
                 </tr>
-                {issueForm?.employeeId === row.employee_id && issueForm?.month === row.month && (
+                {issueFormId === row.id && (
                   <tr className="bg-nte-red/5 border-b border-nte-red/10">
-                    <td colSpan={8} className="px-5 py-3">
-                      <form onSubmit={handleIssue} className="flex items-center gap-3 flex-wrap">
+                    <td colSpan={9} className="px-5 py-3">
+                      <form onSubmit={(e) => handleIssue(e, row)} className="flex items-center gap-3 flex-wrap">
                         <div className="flex items-center gap-2">
                           <span className="text-[12px] text-muted">Notes:</span>
                           <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional" className="h-7 text-[12.5px] bg-white w-52" />
@@ -199,7 +201,7 @@ export function NteTable({ rows, isAdmin }: { rows: NteRow[]; isAdmin: boolean }
                         <Button type="submit" disabled={issueLoading} size="sm" className="bg-nte-red hover:bg-nte-red/90 text-white h-7 text-[11px] px-3">
                           {issueLoading ? 'Saving…' : 'Confirm'}
                         </Button>
-                        <Button type="button" variant="ghost" size="sm" className="h-7 text-[11px]" onClick={() => setIssueForm(null)}>Cancel</Button>
+                        <Button type="button" variant="ghost" size="sm" className="h-7 text-[11px]" onClick={() => setIssueFormId(null)}>Cancel</Button>
                       </form>
                     </td>
                   </tr>
@@ -207,7 +209,7 @@ export function NteTable({ rows, isAdmin }: { rows: NteRow[]; isAdmin: boolean }
               </Fragment>
             ))}
             {filtered.length === 0 && (
-              <tr><td colSpan={8} className="text-center py-12 text-muted text-[13px]">
+              <tr><td colSpan={9} className="text-center py-12 text-muted text-[13px]">
                 {rows.length === 0 ? 'No NTE records for this period.' : 'No records match your search.'}
               </td></tr>
             )}
@@ -218,9 +220,9 @@ export function NteTable({ rows, isAdmin }: { rows: NteRow[]; isAdmin: boolean }
 
       <EmployeeDrawer
         employee={selected ? rowToStats(selected) : null}
-        year={drawerYear}
+        periodStart={selected?.period_start ?? ''}
+        periodEnd={selected?.period_end ?? ''}
         isAdmin={isAdmin}
-        month={drawerMonthNum}
         onClose={() => setSelected(null)}
         onNteAction={() => setSelected(null)}
       />

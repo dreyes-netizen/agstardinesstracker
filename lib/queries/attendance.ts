@@ -1,11 +1,13 @@
 import { db } from '@/lib/db';
-import { attendanceRecords, employees, nteRecords, uploadHistory } from '@/lib/db/schema';
+import { attendanceRecords, uploadHistory } from '@/lib/db/schema';
 import { and, sql } from 'drizzle-orm';
-import { computeNteStatus, NteStatus } from '@/lib/utils/nte-status';
+import { computeWeeklyNteStatus, NteDbStatus, NteStatus } from '@/lib/utils/nte-status';
 import { notExcludedSql } from '@/lib/queries/exclusions';
 import { adjustmentJoinSql, effectiveLateSql } from '@/lib/queries/adjustments';
+import { weeklyLateSql } from '@/lib/queries/nte';
+import { addDays } from '@/lib/utils/week';
 
-export interface EmployeeMonthlyStats {
+export interface EmployeeStats {
   employeeId: string;
   firstName: string;
   lastName: string;
@@ -13,8 +15,10 @@ export interface EmployeeMonthlyStats {
   department: string | null;
   immediateSupervisor: string | null;
   approver2: string | null;
-  lateCount: number;
+  lateCount: number;            // within the period (week, or month for legacy NTEs)
   accumulatedMinutes: number;
+  mtdLates: number;             // month-to-date — what the NTE threshold reads
+  mtdMinutes: number;
   nteStatus: NteStatus;
   nteRecordId: number | null;
   issuedDate: string | null;
@@ -23,19 +27,23 @@ export interface EmployeeMonthlyStats {
 }
 
 export interface DashboardFilters {
-  year: number;
-  month: number;       // 1-12
+  weekStart: string;   // Monday, YYYY-MM-DD
   department?: string;
   immediateSupervisor?: string;
   approver2?: string;
 }
 
-export async function getMonthlyStats(filters: DashboardFilters): Promise<EmployeeMonthlyStats[]> {
-  const monthStr = `${filters.year}-${String(filters.month).padStart(2, '0')}`;
-  const monthStart = `${monthStr}-01`;
-  const nextY = filters.month === 12 ? filters.year + 1 : filters.year;
-  const nextM = filters.month === 12 ? 1 : filters.month + 1;
-  const periodEnd = `${nextY}-${String(nextM).padStart(2, '0')}-01`;
+function employeeFilterSql(filters: DashboardFilters) {
+  return sql`
+    (${filters.department ?? null}::text IS NULL OR e.department = ${filters.department ?? null}::text)
+    AND (${filters.immediateSupervisor ?? null}::text IS NULL OR e.immediate_supervisor = ${filters.immediateSupervisor ?? null}::text)
+    AND (${filters.approver2 ?? null}::text IS NULL OR e.approver2 = ${filters.approver2 ?? null}::text)
+    AND ${notExcludedSql('e')}`;
+}
+
+export async function getWeeklyStats(filters: DashboardFilters): Promise<EmployeeStats[]> {
+  const start = filters.weekStart;
+  const end = addDays(start, 6);
 
   const rows = await db.execute(sql`
     SELECT
@@ -46,30 +54,25 @@ export async function getMonthlyStats(filters: DashboardFilters): Promise<Employ
       e.department,
       e.immediate_supervisor,
       e.approver2,
-      COUNT(CASE WHEN ${effectiveLateSql('a')} > 0 THEN 1 END)::int AS late_count,
-      COALESCE(SUM(${effectiveLateSql('a')}), 0)::int AS accumulated_minutes,
+      COALESCE(w.week_lates, 0)   AS late_count,
+      COALESCE(w.week_minutes, 0) AS accumulated_minutes,
+      COALESCE(w.mtd_lates, 0)    AS mtd_lates,
+      COALESCE(w.mtd_minutes, 0)  AS mtd_minutes,
+      COALESCE(w.needs_nte, false) AS needs_nte,
       n.id AS nte_record_id,
       n.status AS nte_db_status,
       n.issued_date,
       n.issued_by,
       n.acknowledged_date
     FROM employees e
-    LEFT JOIN attendance_records a
-      ON e.employee_id = a.employee_id
-      AND a.date >= ${monthStart}::date
-      AND a.date < ${periodEnd}::date
-    ${adjustmentJoinSql('a')}
+    LEFT JOIN (${weeklyLateSql({ from: start, to: end })}) w
+      ON w.employee_id = e.employee_id
+      AND w.week_start = ${start}::date
     LEFT JOIN nte_records n
-      ON e.employee_id = n.employee_id
-      AND n.month = ${monthStr}
-    WHERE
-      (${filters.department ?? null}::text IS NULL OR e.department = ${filters.department ?? null}::text)
-      AND (${filters.immediateSupervisor ?? null}::text IS NULL OR e.immediate_supervisor = ${filters.immediateSupervisor ?? null}::text)
-      AND (${filters.approver2 ?? null}::text IS NULL OR e.approver2 = ${filters.approver2 ?? null}::text)
-      AND ${notExcludedSql('e')}
-    GROUP BY e.employee_id, e.first_name, e.last_name, e.middle_name,
-             e.department, e.immediate_supervisor, e.approver2,
-             n.id, n.status, n.issued_date, n.issued_by, n.acknowledged_date
+      ON n.employee_id = e.employee_id
+      AND n.period_start = ${start}::date
+      AND n.period_end = ${end}::date
+    WHERE ${employeeFilterSql(filters)}
     ORDER BY
       CASE n.status
         WHEN 'required' THEN 1
@@ -80,9 +83,9 @@ export async function getMonthlyStats(filters: DashboardFilters): Promise<Employ
   `);
 
   return (rows.rows as Record<string, unknown>[]).map((row) => {
-    const lateCount = Number(row.late_count) || 0;
-    const accumulatedMinutes = Number(row.accumulated_minutes) || 0;
-    const dbStatus = (row.nte_db_status as 'required' | 'issued' | 'acknowledged' | null) ?? null;
+    const mtdLates = Number(row.mtd_lates) || 0;
+    const mtdMinutes = Number(row.mtd_minutes) || 0;
+    const dbStatus = (row.nte_db_status as NteDbStatus) ?? null;
 
     return {
       employeeId: String(row.employee_id),
@@ -92,9 +95,11 @@ export async function getMonthlyStats(filters: DashboardFilters): Promise<Employ
       department: row.department ? String(row.department) : null,
       immediateSupervisor: row.immediate_supervisor ? String(row.immediate_supervisor) : null,
       approver2: row.approver2 ? String(row.approver2) : null,
-      lateCount,
-      accumulatedMinutes,
-      nteStatus: computeNteStatus(lateCount, accumulatedMinutes, dbStatus),
+      lateCount: Number(row.late_count) || 0,
+      accumulatedMinutes: Number(row.accumulated_minutes) || 0,
+      mtdLates,
+      mtdMinutes,
+      nteStatus: computeWeeklyNteStatus(row.needs_nte === true, mtdLates, mtdMinutes, dbStatus),
       nteRecordId: row.nte_record_id ? Number(row.nte_record_id) : null,
       issuedDate: row.issued_date ? String(row.issued_date) : null,
       issuedBy: row.issued_by ? String(row.issued_by) : null,
@@ -109,12 +114,6 @@ export interface DayOfWeekStat {
 }
 
 export async function getLateByDayOfWeek(filters: DashboardFilters): Promise<DayOfWeekStat[]> {
-  const monthStr = `${filters.year}-${String(filters.month).padStart(2, '0')}`;
-  const monthStart = `${monthStr}-01`;
-  const nextY = filters.month === 12 ? filters.year + 1 : filters.year;
-  const nextM = filters.month === 12 ? 1 : filters.month + 1;
-  const periodEnd = `${nextY}-${String(nextM).padStart(2, '0')}-01`;
-
   // Always join employees so excluded people are filtered out of the chart, even
   // when no department/supervisor/manager filter is active.
   const rows = await db.execute(sql`
@@ -125,12 +124,9 @@ export async function getLateByDayOfWeek(filters: DashboardFilters): Promise<Day
     JOIN employees e ON a.employee_id = e.employee_id
     ${adjustmentJoinSql('a')}
     WHERE ${effectiveLateSql('a')} > 0
-      AND a.date >= ${monthStart}::date
-      AND a.date < ${periodEnd}::date
-      AND (${filters.department          ?? null}::text IS NULL OR e.department           = ${filters.department          ?? null}::text)
-      AND (${filters.immediateSupervisor ?? null}::text IS NULL OR e.immediate_supervisor = ${filters.immediateSupervisor ?? null}::text)
-      AND (${filters.approver2           ?? null}::text IS NULL OR e.approver2            = ${filters.approver2           ?? null}::text)
-      AND ${notExcludedSql('e')}
+      AND a.date >= ${filters.weekStart}::date
+      AND a.date <= ${addDays(filters.weekStart, 6)}::date
+      AND ${employeeFilterSql(filters)}
     GROUP BY dow
     ORDER BY dow
   `);
@@ -185,6 +181,16 @@ export async function hasAttendanceData(year: number, month: number): Promise<bo
   return (result.rows[0] as Record<string, unknown>).has_data === true;
 }
 
+export async function hasAttendanceInRange(start: string, end: string): Promise<boolean> {
+  const result = await db.execute(sql`
+    SELECT EXISTS (
+      SELECT 1 FROM attendance_records
+      WHERE date >= ${start}::date AND date <= ${end}::date
+    ) AS has_data
+  `);
+  return (result.rows[0] as Record<string, unknown>).has_data === true;
+}
+
 export interface EmployeeLateRecord {
   date: string;
   lateMinutes: number;          // effective (after adjustment)
@@ -197,13 +203,8 @@ export interface EmployeeLateRecord {
 }
 
 // Filters on the ORIGINAL late minutes so waived days stay visible (and undoable)
-// in the employee drawer.
-export async function getEmployeeLateRecords(employeeId: string, year: number, month: number): Promise<EmployeeLateRecord[]> {
-  const monthStr = `${year}-${String(month).padStart(2, '0')}`;
-  const monthStart = `${monthStr}-01`;
-  const nextY = month === 12 ? year + 1 : year;
-  const nextM = month === 12 ? 1 : month + 1;
-  const periodEnd = `${nextY}-${String(nextM).padStart(2, '0')}-01`;
+// in the employee drawer. Range is inclusive.
+export async function getEmployeeLateRecords(employeeId: string, start: string, end: string): Promise<EmployeeLateRecord[]> {
   const rows = await db.execute(sql`
     SELECT
       a.date::text AS date,
@@ -217,8 +218,8 @@ export async function getEmployeeLateRecords(employeeId: string, year: number, m
     FROM attendance_records a
     ${adjustmentJoinSql('a')}
     WHERE a.employee_id = ${employeeId}
-      AND a.date >= ${monthStart}::date
-      AND a.date < ${periodEnd}::date
+      AND a.date >= ${start}::date
+      AND a.date <= ${end}::date
       AND a.late_minutes > 0
     ORDER BY a.date
   `);

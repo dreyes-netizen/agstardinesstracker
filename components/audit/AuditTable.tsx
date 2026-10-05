@@ -5,6 +5,7 @@ import {
   useReactTable, getCoreRowModel, getSortedRowModel,
   flexRender, createColumnHelper, SortingState,
 } from '@tanstack/react-table';
+import { formatPeriod } from '@/lib/utils/week';
 
 export interface AuditEntry {
   id: number;
@@ -15,6 +16,8 @@ export interface AuditEntry {
   employeeId: string;
   name: string;
   month: string;
+  periodStart: string;
+  periodEnd: string;
   details: string;
 }
 
@@ -79,7 +82,13 @@ const columns = [
   }),
   col.accessor('month', {
     header: 'Period',
-    cell: (info) => <span className="text-[12px] text-muted">{fmtMonth(info.getValue())}</span>,
+    cell: ({ row }) => (
+      <span className="text-[12px] text-muted whitespace-nowrap">
+        {row.original.periodStart
+          ? formatPeriod(row.original.periodStart, row.original.periodEnd)
+          : fmtMonth(row.original.month)}
+      </span>
+    ),
   }),
   col.accessor('details', {
     header: 'Notes',
@@ -122,7 +131,7 @@ export function AuditTable({ data }: { data: AuditEntry[] }) {
     const rows: string[][] = [
       ['When', 'Actor', 'Role', 'Action', 'Employee', 'Employee ID', 'Period', 'Notes'],
       ...filtered.map((e) => [
-        fmtWhen(e.createdAt), e.actorEmail, e.actorRole, e.action, e.name, e.employeeId, e.month, e.details,
+        fmtWhen(e.createdAt), e.actorEmail, e.actorRole, e.action, e.name, e.employeeId, e.periodStart ? formatPeriod(e.periodStart, e.periodEnd) : e.month, e.details,
       ]),
     ];
     const csv = rows.map((r) => r.map(escCsv).join(',')).join('\r\n');

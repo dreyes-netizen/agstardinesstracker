@@ -3,13 +3,14 @@
 import { requireRole, type SessionUser } from '@/lib/auth/session';
 import {
   getOriginalLateMinutes, getAdjustment, upsertAdjustment, deleteAdjustment,
-  getEffectiveMonthTotals, getNteDbStatus, deleteRequiredNte,
+  getEffectivePeriodTotals, getNteDbStatus, deleteRequiredNte,
 } from '@/lib/queries/adjustments';
-import { upsertNteRequired } from '@/lib/queries/nte';
+import { upsertNteRequired, reconcileWeeklyNte } from '@/lib/queries/nte';
 import { addNteAuditEntry } from '@/lib/queries/audit';
 import { validateAdjustment, shouldClearRequiredNte } from '@/lib/utils/late-adjustment';
 import { computeNteStatus } from '@/lib/utils/nte-status';
 import { formatDate } from '@/lib/utils/date';
+import { WEEKLY_NTE_START, monthEnd, weekEnd, weekStart } from '@/lib/utils/week';
 import { revalidatePath } from 'next/cache';
 
 type Result = { ok: true } | { error: string };
@@ -23,20 +24,43 @@ function revalidateAll() {
   revalidatePath('/audit');
 }
 
-// Keep the month's nte_records row in step with the effective totals: drop a
-// still-'required' row that no longer qualifies, or re-create one that does again.
-async function reconcileNte(employeeId: string, month: string, user: SessionUser) {
-  const { lateCount, accumulatedMinutes } = await getEffectiveMonthTotals(employeeId, month);
-  const status = await getNteDbStatus(employeeId, month);
-  if (shouldClearRequiredNte(lateCount, accumulatedMinutes, status)) {
-    await deleteRequiredNte(employeeId, month);
+// The NTE period a late date belongs to: its Mon–Sun week, or its whole month
+// before the weekly rule started.
+function ntePeriodFor(date: string) {
+  return date < WEEKLY_NTE_START
+    ? { periodStart: `${date.slice(0, 7)}-01`, periodEnd: monthEnd(date) }
+    : { periodStart: weekStart(date), periodEnd: weekEnd(date) };
+}
+
+// Keep nte_records in step with the effective totals: drop still-'required' rows
+// that no longer qualify, and re-create ones that do again.
+async function reconcileNte(employeeId: string, date: string, user: SessionUser) {
+  const actor = { actorEmail: user.email, actorRole: user.role };
+
+  if (date < WEEKLY_NTE_START) {
+    const { periodStart, periodEnd } = ntePeriodFor(date);
+    const { lateCount, accumulatedMinutes } = await getEffectivePeriodTotals(employeeId, periodStart, periodEnd);
+    const status = await getNteDbStatus(employeeId, periodStart, periodEnd);
+    if (shouldClearRequiredNte(lateCount, accumulatedMinutes, status)) {
+      await deleteRequiredNte(employeeId, periodStart, periodEnd);
+      await addNteAuditEntry({
+        employeeId, periodStart, periodEnd, action: 'nte_auto_cleared', ...actor,
+        details: `Below threshold after adjustment: ${lateCount} lates, ${accumulatedMinutes} min`,
+      });
+    } else if (status === null && computeNteStatus(lateCount, accumulatedMinutes, null) === 'required') {
+      await upsertNteRequired(employeeId, periodStart, periodEnd);
+    }
+    return;
+  }
+
+  // Month-to-date totals feed every later week of the month, so re-check them all.
+  const lastDay = monthEnd(date);
+  const cleared = await reconcileWeeklyNte(employeeId, weekStart(date), weekStart(lastDay), weekEnd(lastDay));
+  for (const c of cleared) {
     await addNteAuditEntry({
-      employeeId, month, action: 'nte_auto_cleared',
-      actorEmail: user.email, actorRole: user.role,
-      details: `Below threshold after adjustment: ${lateCount} lates, ${accumulatedMinutes} min`,
+      employeeId, periodStart: c.period_start, periodEnd: c.period_end, action: 'nte_auto_cleared', ...actor,
+      details: `No longer required after adjusting ${formatDate(date)}`,
     });
-  } else if (status === null && computeNteStatus(lateCount, accumulatedMinutes, null) === 'required') {
-    await upsertNteRequired(employeeId, month);
   }
 }
 
@@ -54,14 +78,13 @@ export async function saveLateAdjustmentAction(
 
   await upsertAdjustment(employeeId, date, adjustedMinutes, reason, user.email);
 
-  const month = date.slice(0, 7);
   await addNteAuditEntry({
-    employeeId, month,
+    employeeId, ...ntePeriodFor(date), month: date.slice(0, 7),
     action: adjustedMinutes === 0 ? 'late_waived' : 'late_adjusted',
     actorEmail: user.email, actorRole: user.role,
     details: `${formatDate(date)}: ${original} → ${adjustedMinutes} min — ${reason}`,
   });
-  await reconcileNte(employeeId, month, user);
+  await reconcileNte(employeeId, date, user);
   revalidateAll();
   return { ok: true };
 }
@@ -76,13 +99,12 @@ export async function removeLateAdjustmentAction(employeeId: string, date: strin
 
   await deleteAdjustment(employeeId, date);
 
-  const month = date.slice(0, 7);
   await addNteAuditEntry({
-    employeeId, month, action: 'late_adjustment_removed',
+    employeeId, ...ntePeriodFor(date), month: date.slice(0, 7), action: 'late_adjustment_removed',
     actorEmail: user.email, actorRole: user.role,
     details: `${formatDate(date)}: restored to ${original ?? '?'} min (was ${existing.adjustedMinutes})`,
   });
-  await reconcileNte(employeeId, month, user);
+  await reconcileNte(employeeId, date, user);
   revalidateAll();
   return { ok: true };
 }

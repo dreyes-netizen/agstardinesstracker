@@ -48,7 +48,7 @@ export function Sidebar({ open, onClose, user }: SidebarProps) {
 
   function navHref(base: string): string {
     if (base === '/' && dashboard)
-      return buildHref('/', { year: dashboard.year, month: dashboard.month, dept: dashboard.dept, supervisor: dashboard.supervisor, manager: dashboard.manager });
+      return buildHref('/', { week: dashboard.week, dept: dashboard.dept, supervisor: dashboard.supervisor, manager: dashboard.manager });
     if (base === '/attendance-score' && score)
       return buildHref('/attendance-score', { start: score.start, end: score.end, dept: score.dept, supervisor: score.supervisor, manager: score.manager });
     if (base === '/leave-report' && leave)

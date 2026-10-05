@@ -58,8 +58,8 @@ export async function deleteAdjustment(employeeId: string, date: string) {
     .where(and(eq(lateAdjustments.employeeId, employeeId), eq(lateAdjustments.date, date)));
 }
 
-// ── NTE reconciliation inputs ──────────────────────────────────────────────
-export async function getEffectiveMonthTotals(employeeId: string, month: string) {
+// ── Legacy monthly NTE reconciliation (dates before WEEKLY_NTE_START) ─────
+export async function getEffectivePeriodTotals(employeeId: string, start: string, end: string) {
   const r = await db.execute(sql`
     SELECT
       COUNT(CASE WHEN ${effectiveLateSql('a')} > 0 THEN 1 END)::int AS late_count,
@@ -67,28 +67,33 @@ export async function getEffectiveMonthTotals(employeeId: string, month: string)
     FROM attendance_records a
     ${adjustmentJoinSql('a')}
     WHERE a.employee_id = ${employeeId}
-      AND TO_CHAR(a.date::date, 'YYYY-MM') = ${month}
+      AND a.date >= ${start}::date
+      AND a.date <= ${end}::date
   `);
   const row = r.rows[0] as { late_count: number; accumulated_minutes: number };
   return { lateCount: Number(row.late_count) || 0, accumulatedMinutes: Number(row.accumulated_minutes) || 0 };
 }
 
-export async function getNteDbStatus(employeeId: string, month: string): Promise<NteDbStatus> {
+function periodWhere(employeeId: string, start: string, end: string) {
+  return and(
+    eq(nteRecords.employeeId, employeeId),
+    eq(nteRecords.periodStart, start),
+    eq(nteRecords.periodEnd, end),
+  );
+}
+
+export async function getNteDbStatus(employeeId: string, start: string, end: string): Promise<NteDbStatus> {
   const rows = await db
     .select({ status: nteRecords.status })
     .from(nteRecords)
-    .where(and(eq(nteRecords.employeeId, employeeId), eq(nteRecords.month, month)))
+    .where(periodWhere(employeeId, start, end))
     .limit(1);
   return (rows[0]?.status as NteDbStatus) ?? null;
 }
 
 // Guarded on status so an NTE issued concurrently is never removed.
-export async function deleteRequiredNte(employeeId: string, month: string) {
+export async function deleteRequiredNte(employeeId: string, start: string, end: string) {
   await db
     .delete(nteRecords)
-    .where(and(
-      eq(nteRecords.employeeId, employeeId),
-      eq(nteRecords.month, month),
-      eq(nteRecords.status, 'required'),
-    ));
+    .where(and(periodWhere(employeeId, start, end), eq(nteRecords.status, 'required')));
 }
