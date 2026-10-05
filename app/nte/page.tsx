@@ -2,9 +2,9 @@ import { Suspense } from 'react';
 import { NteTable } from '@/components/nte/NteTable';
 import { NteFilterBar } from '@/components/nte/NteFilterBar';
 import { getSessionUser } from '@/lib/auth/session';
-import { getNteList, getNteDepartments, getNteCounts } from '@/lib/queries/nte';
+import { getNteList, getNteFilterOptions, getNteCounts } from '@/lib/queries/nte';
 import { getLatestAttendancePeriod } from '@/lib/queries/attendance';
-import { addDays, isIsoDate, lastCompleteWeekStart, monthEnd, todayPH } from '@/lib/utils/week';
+import { addDays, formatPeriod, isIsoDate, lastCompleteWeekStart, monthEnd, todayPH } from '@/lib/utils/week';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,21 +18,29 @@ interface PageProps {
 }
 
 export default async function NtePage({ searchParams }: PageProps) {
-  const [departments, latestPeriod, user] = await Promise.all([
-    getNteDepartments(), getLatestAttendancePeriod(), getSessionUser(),
+  const [{ months, departments }, latestPeriod, user] = await Promise.all([
+    getNteFilterOptions(), getLatestAttendancePeriod(), getSessionUser(),
   ]);
 
-  // Presets follow the uploaded data: "last week" is the latest Mon–Sun week it
-  // fully covers (the week reviewed on Monday); "this month" is its month.
+  // "Last week" is the latest Mon–Sun week the uploaded data fully covers — the
+  // week reviewed on Monday — and the default view.
   const latest = latestPeriod?.latestDate ?? todayPH();
   const lastWeekStart = lastCompleteWeekStart(latest);
-  const presets = {
-    lastWeek: { start: lastWeekStart, end: addDays(lastWeekStart, 6) },
-    thisMonth: { start: `${latest.slice(0, 7)}-01`, end: monthEnd(latest) },
-  };
+  const lastWeek = { start: lastWeekStart, end: addDays(lastWeekStart, 6) };
 
-  let start = isIsoDate(searchParams.start) ? searchParams.start : presets.lastWeek.start;
-  let end = isIsoDate(searchParams.end) ? searchParams.end : presets.lastWeek.end;
+  // Month shortcuts: every month with data, plus "All time" to find older NTEs
+  // that are still open.
+  const monthRanges = months.map((m) => {
+    const start = `${m}-01`;
+    const end = monthEnd(start);
+    return { label: formatPeriod(start, end), start, end };
+  });
+  const monthOptions = monthRanges.length
+    ? [{ label: 'All time', start: monthRanges[monthRanges.length - 1].start, end: monthRanges[0].end }, ...monthRanges]
+    : [];
+
+  let start = isIsoDate(searchParams.start) ? searchParams.start : lastWeek.start;
+  let end = isIsoDate(searchParams.end) ? searchParams.end : lastWeek.end;
   if (start > end) [start, end] = [end, start];
 
   const [rows, counts] = await Promise.all([
@@ -54,7 +62,8 @@ export default async function NtePage({ searchParams }: PageProps) {
           <NteFilterBar
             start={start}
             end={end}
-            presets={presets}
+            lastWeek={lastWeek}
+            monthOptions={monthOptions}
             departments={departments}
             selectedStatus={searchParams.status}
             selectedDept={searchParams.dept}
