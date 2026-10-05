@@ -5,12 +5,13 @@ import { DayOfWeekCards } from '@/components/dashboard/DayOfWeekCards';
 import { EmployeeTable } from '@/components/dashboard/EmployeeTable';
 import { getFilterOptions } from '@/lib/queries/employees';
 import { getSessionUser } from '@/lib/auth/session';
-import { getWeeklyStats, hasAttendanceInRange, getLatestAttendancePeriod, getLateByDayOfWeek } from '@/lib/queries/attendance';
-import { addDays, formatPeriod, isIsoDate, lastCompleteWeekStart, todayPH, weekStart as toWeekStart } from '@/lib/utils/week';
+import { getRangeStats, hasAttendanceInRange, getLatestAttendancePeriod, getLateByDayOfWeek, getAttendanceMonths } from '@/lib/queries/attendance';
+import { addDays, buildMonthOptions, formatPeriod, isIsoDate, lastCompleteWeekStart, todayPH } from '@/lib/utils/week';
 
 interface PageProps {
   searchParams: {
-    week?: string; // any date in the week; snapped to its Monday
+    start?: string; // YYYY-MM-DD
+    end?: string;
     dept?: string;
     supervisor?: string;
     manager?: string;
@@ -24,25 +25,27 @@ export default async function DashboardPage({ searchParams }: PageProps) {
 
   // Round 1: latestPeriod always runs so the "Data through …" label stays visible
   // on every filter selection, not just the initial page load.
-  const [latestPeriod, filterOptions, user] = await Promise.all([
+  const [latestPeriod, filterOptions, user, months] = await Promise.all([
     getLatestAttendancePeriod(),
     getFilterOptions(),
     getSessionUser(),
+    getAttendanceMonths(),
   ]);
 
   // Default: the last Mon–Sun week fully covered by uploaded data — the week
   // reviewed on Monday.
-  const weekStart = isIsoDate(searchParams.week)
-    ? toWeekStart(searchParams.week)
-    : lastCompleteWeekStart(latestPeriod?.latestDate ?? todayPH());
-  const weekEnd = addDays(weekStart, 6);
+  const lastWeekStart = lastCompleteWeekStart(latestPeriod?.latestDate ?? todayPH());
+  const lastWeek = { start: lastWeekStart, end: addDays(lastWeekStart, 6) };
+  let start = isIsoDate(searchParams.start) ? searchParams.start : lastWeek.start;
+  let end = isIsoDate(searchParams.end) ? searchParams.end : lastWeek.end;
+  if (start > end) [start, end] = [end, start];
 
-  const filters = { weekStart, department: dept, immediateSupervisor: supervisor, approver2: manager };
+  const filters = { start, end, department: dept, immediateSupervisor: supervisor, approver2: manager };
 
-  // Round 2: data queries, now that the week is resolved.
+  // Round 2: data queries, now that the range is resolved.
   const [dataExists, employees, dowStats] = await Promise.all([
-    hasAttendanceInRange(weekStart, weekEnd),
-    getWeeklyStats(filters),
+    hasAttendanceInRange(start, end),
+    getRangeStats(filters),
     getLateByDayOfWeek(filters),
   ]);
 
@@ -54,13 +57,16 @@ export default async function DashboardPage({ searchParams }: PageProps) {
     ? Math.round((lateCount / employees.length) * 100)
     : 0;
 
-  const weekLabel = formatPeriod(weekStart, weekEnd);
+  const rangeLabel = formatPeriod(start, end);
 
   return (
     <div className="flex flex-col h-full">
       <Suspense>
         <FilterBar
-          weekStart={weekStart}
+          start={start}
+          end={end}
+          lastWeek={lastWeek}
+          monthOptions={buildMonthOptions(months)}
           departments={filterOptions.departments}
           supervisors={filterOptions.supervisors}
           managers={filterOptions.managers}
@@ -86,11 +92,11 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           </div>
         )}
         {dataExists ? (
-          <EmployeeTable data={employees} weekStart={weekStart} dept={dept} supervisor={supervisor} manager={manager} isAdmin={user?.role === 'admin'} />
+          <EmployeeTable data={employees} start={start} end={end} dept={dept} supervisor={supervisor} manager={manager} isAdmin={user?.role === 'admin'} />
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-center">
-            <p className="text-[15px] font-medium text-app-text">No attendance data for {weekLabel}</p>
-            <p className="text-[13px] text-muted mt-1">Upload an attendance report covering this week to see results.</p>
+            <p className="text-[15px] font-medium text-app-text">No attendance data for {rangeLabel}</p>
+            <p className="text-[13px] text-muted mt-1">Upload an attendance report covering this period to see results.</p>
           </div>
         )}
       </div>

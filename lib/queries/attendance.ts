@@ -1,11 +1,20 @@
 import { db } from '@/lib/db';
 import { attendanceRecords, uploadHistory } from '@/lib/db/schema';
 import { and, sql } from 'drizzle-orm';
-import { computeWeeklyNteStatus, NteDbStatus, NteStatus } from '@/lib/utils/nte-status';
+import { rangeNteStatus, NteDbStatus, NteStatus } from '@/lib/utils/nte-status';
 import { notExcludedSql } from '@/lib/queries/exclusions';
 import { adjustmentJoinSql, effectiveLateSql } from '@/lib/queries/adjustments';
-import { weeklyLateSql } from '@/lib/queries/nte';
-import { addDays } from '@/lib/utils/week';
+import { weekStart } from '@/lib/utils/week';
+
+export interface EmployeeNte {
+  periodStart: string;
+  periodEnd: string;
+  status: Exclude<NteDbStatus, null>;
+  issuedDate: string | null;
+  issuedBy: string | null;
+  notes: string | null;
+  acknowledgedDate: string | null;
+}
 
 export interface EmployeeStats {
   employeeId: string;
@@ -15,19 +24,17 @@ export interface EmployeeStats {
   department: string | null;
   immediateSupervisor: string | null;
   approver2: string | null;
-  lateCount: number;            // within the period (week, or month for legacy NTEs)
+  lateCount: number;            // within the selected range
   accumulatedMinutes: number;
-  mtdLates: number;             // month-to-date — what the NTE threshold reads
+  mtdLates: number;             // month-to-date as of the range end — what the NTE threshold reads
   mtdMinutes: number;
   nteStatus: NteStatus;
-  nteRecordId: number | null;
-  issuedDate: string | null;
-  issuedBy: string | null;
-  acknowledgedDate: string | null;
+  ntes: EmployeeNte[];          // NTEs whose period starts in the range, oldest first
 }
 
 export interface DashboardFilters {
-  weekStart: string;   // Monday, YYYY-MM-DD
+  start: string;       // YYYY-MM-DD, inclusive
+  end: string;
   department?: string;
   immediateSupervisor?: string;
   approver2?: string;
@@ -41,10 +48,16 @@ function employeeFilterSql(filters: DashboardFilters) {
     AND ${notExcludedSql('e')}`;
 }
 
-export async function getWeeklyStats(filters: DashboardFilters): Promise<EmployeeStats[]> {
-  const start = filters.weekStart;
-  const end = addDays(start, 6);
+const STATUS_ORDER: Record<NteStatus, number> = { required: 0, issued: 1, warning: 2, acknowledged: 3, safe: 4 };
 
+export async function getRangeStats(filters: DashboardFilters): Promise<EmployeeStats[]> {
+  const { start, end } = filters;
+  const monthStart = `${end.slice(0, 7)}-01`;
+  const late = effectiveLateSql('a');
+
+  // One pass over attendance gives both the range totals and month-to-date
+  // totals (1st of the end month → end). NTEs use the same "period starts in
+  // range" rule as NTE Management.
   const rows = await db.execute(sql`
     SELECT
       e.employee_id,
@@ -54,58 +67,67 @@ export async function getWeeklyStats(filters: DashboardFilters): Promise<Employe
       e.department,
       e.immediate_supervisor,
       e.approver2,
-      COALESCE(w.week_lates, 0)   AS late_count,
-      COALESCE(w.week_minutes, 0) AS accumulated_minutes,
-      COALESCE(w.mtd_lates, 0)    AS mtd_lates,
-      COALESCE(w.mtd_minutes, 0)  AS mtd_minutes,
-      COALESCE(w.needs_nte, false) AS needs_nte,
-      n.id AS nte_record_id,
-      n.status AS nte_db_status,
-      n.issued_date,
-      n.issued_by,
-      n.acknowledged_date
+      COALESCE(t.late_count, 0)          AS late_count,
+      COALESCE(t.accumulated_minutes, 0) AS accumulated_minutes,
+      COALESCE(t.mtd_lates, 0)           AS mtd_lates,
+      COALESCE(t.mtd_minutes, 0)         AS mtd_minutes,
+      COALESCE(n.ntes, '[]'::json)       AS ntes
     FROM employees e
-    LEFT JOIN (${weeklyLateSql({ from: start, to: end })}) w
-      ON w.employee_id = e.employee_id
-      AND w.week_start = ${start}::date
-    LEFT JOIN nte_records n
-      ON n.employee_id = e.employee_id
-      AND n.period_start = ${start}::date
-      AND n.period_end = ${end}::date
+    LEFT JOIN (
+      SELECT
+        a.employee_id,
+        COUNT(*) FILTER (WHERE ${late} > 0 AND a.date >= ${start}::date)::int           AS late_count,
+        COALESCE(SUM(${late}) FILTER (WHERE a.date >= ${start}::date), 0)::int          AS accumulated_minutes,
+        COUNT(*) FILTER (WHERE ${late} > 0 AND a.date >= ${monthStart}::date)::int      AS mtd_lates,
+        COALESCE(SUM(${late}) FILTER (WHERE a.date >= ${monthStart}::date), 0)::int     AS mtd_minutes
+      FROM attendance_records a
+      ${adjustmentJoinSql('a')}
+      WHERE a.date >= LEAST(${start}::date, ${monthStart}::date)
+        AND a.date <= ${end}::date
+      GROUP BY a.employee_id
+    ) t ON t.employee_id = e.employee_id
+    LEFT JOIN (
+      SELECT
+        employee_id,
+        json_agg(json_build_object(
+          'periodStart', period_start::text,
+          'periodEnd', period_end::text,
+          'status', status,
+          'issuedDate', issued_date::text,
+          'issuedBy', issued_by,
+          'notes', notes,
+          'acknowledgedDate', acknowledged_date::text
+        ) ORDER BY period_start) AS ntes
+      FROM nte_records
+      WHERE period_start >= ${weekStart(start)}::date
+        AND period_start <= ${end}::date
+      GROUP BY employee_id
+    ) n ON n.employee_id = e.employee_id
     WHERE ${employeeFilterSql(filters)}
-    ORDER BY
-      CASE n.status
-        WHEN 'required' THEN 1
-        WHEN 'issued'   THEN 2
-        ELSE 3
-      END,
-      late_count DESC
   `);
 
-  return (rows.rows as Record<string, unknown>[]).map((row) => {
-    const mtdLates = Number(row.mtd_lates) || 0;
-    const mtdMinutes = Number(row.mtd_minutes) || 0;
-    const dbStatus = (row.nte_db_status as NteDbStatus) ?? null;
-
-    return {
-      employeeId: String(row.employee_id),
-      firstName: String(row.first_name),
-      lastName: String(row.last_name),
-      middleName: row.middle_name ? String(row.middle_name) : null,
-      department: row.department ? String(row.department) : null,
-      immediateSupervisor: row.immediate_supervisor ? String(row.immediate_supervisor) : null,
-      approver2: row.approver2 ? String(row.approver2) : null,
-      lateCount: Number(row.late_count) || 0,
-      accumulatedMinutes: Number(row.accumulated_minutes) || 0,
-      mtdLates,
-      mtdMinutes,
-      nteStatus: computeWeeklyNteStatus(row.needs_nte === true, mtdLates, mtdMinutes, dbStatus),
-      nteRecordId: row.nte_record_id ? Number(row.nte_record_id) : null,
-      issuedDate: row.issued_date ? String(row.issued_date) : null,
-      issuedBy: row.issued_by ? String(row.issued_by) : null,
-      acknowledgedDate: row.acknowledged_date ? String(row.acknowledged_date) : null,
-    };
-  });
+  return (rows.rows as Record<string, unknown>[])
+    .map((row) => {
+      const mtdLates = Number(row.mtd_lates) || 0;
+      const mtdMinutes = Number(row.mtd_minutes) || 0;
+      const ntes = (typeof row.ntes === 'string' ? JSON.parse(row.ntes) : row.ntes) as EmployeeNte[];
+      return {
+        employeeId: String(row.employee_id),
+        firstName: String(row.first_name),
+        lastName: String(row.last_name),
+        middleName: row.middle_name ? String(row.middle_name) : null,
+        department: row.department ? String(row.department) : null,
+        immediateSupervisor: row.immediate_supervisor ? String(row.immediate_supervisor) : null,
+        approver2: row.approver2 ? String(row.approver2) : null,
+        lateCount: Number(row.late_count) || 0,
+        accumulatedMinutes: Number(row.accumulated_minutes) || 0,
+        mtdLates,
+        mtdMinutes,
+        nteStatus: rangeNteStatus(ntes.map((n) => n.status), mtdLates, mtdMinutes),
+        ntes,
+      };
+    })
+    .sort((a, b) => STATUS_ORDER[a.nteStatus] - STATUS_ORDER[b.nteStatus] || b.lateCount - a.lateCount);
 }
 
 export interface DayOfWeekStat {
@@ -124,8 +146,8 @@ export async function getLateByDayOfWeek(filters: DashboardFilters): Promise<Day
     JOIN employees e ON a.employee_id = e.employee_id
     ${adjustmentJoinSql('a')}
     WHERE ${effectiveLateSql('a')} > 0
-      AND a.date >= ${filters.weekStart}::date
-      AND a.date <= ${addDays(filters.weekStart, 6)}::date
+      AND a.date >= ${filters.start}::date
+      AND a.date <= ${filters.end}::date
       AND ${employeeFilterSql(filters)}
     GROUP BY dow
     ORDER BY dow
@@ -179,6 +201,16 @@ export async function hasAttendanceData(year: number, month: number): Promise<bo
     ) AS has_data
   `);
   return (result.rows[0] as Record<string, unknown>).has_data === true;
+}
+
+// Every month with uploaded attendance, newest first ("2026-09").
+export async function getAttendanceMonths(): Promise<string[]> {
+  const rows = await db.execute(sql`
+    SELECT DISTINCT TO_CHAR(date::date, 'YYYY-MM') AS month
+    FROM attendance_records
+    ORDER BY month DESC
+  `);
+  return (rows.rows as { month: string }[]).map((r) => r.month);
 }
 
 export async function hasAttendanceInRange(start: string, end: string): Promise<boolean> {

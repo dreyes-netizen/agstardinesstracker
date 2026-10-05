@@ -3,7 +3,8 @@
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { formatDate } from '@/lib/utils/date';
-import { addDays, formatPeriod, weekStart as toWeekStart } from '@/lib/utils/week';
+import { formatPeriod, type MonthOption } from '@/lib/utils/week';
+import { DateRangeControls } from '@/components/filters/DateRangeControls';
 import { useFilterContext } from '@/context/FilterContext';
 
 interface Combination {
@@ -13,7 +14,10 @@ interface Combination {
 }
 
 interface FilterBarProps {
-  weekStart: string; // Monday, YYYY-MM-DD
+  start: string;
+  end: string;
+  lastWeek: { start: string; end: string };
+  monthOptions: MonthOption[];
   departments: string[];
   supervisors: string[];
   managers: string[];
@@ -28,11 +32,9 @@ const SELECT_CLS =
   'bg-ground border border-border rounded-[5px] px-2.5 py-1.5 text-[12.5px] text-app-text focus:outline-none focus-visible:ring-2 focus-visible:ring-app-blue/40 min-w-0';
 const LABEL_CLS =
   'text-[12.5px] text-muted';
-const NAV_BTN_CLS =
-  'border border-border rounded-[5px] w-7 h-[30px] text-[15px] leading-none text-muted hover:text-app-text hover:border-app-text/30 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-app-blue/40';
 
 export function FilterBar({
-  weekStart, departments, supervisors, managers, combinations,
+  start, end, lastWeek, monthOptions, departments, supervisors, managers, combinations,
   selectedDept, selectedSupervisor, selectedManager, latestDate,
 }: FilterBarProps) {
   const router = useRouter();
@@ -44,9 +46,10 @@ export function FilterBar({
   // Restore saved filters whenever the URL has no params (covers both initial mount
   // and clicking the nav button again while already on this page).
   useEffect(() => {
-    if (!searchParams.get('week') && savedDashboard) {
+    if (!searchParams.get('start') && savedDashboard) {
       const params = new URLSearchParams();
-      params.set('week', savedDashboard.week);
+      params.set('start', savedDashboard.start);
+      params.set('end', savedDashboard.end);
       if (savedDashboard.dept) params.set('dept', savedDashboard.dept);
       if (savedDashboard.supervisor) params.set('supervisor', savedDashboard.supervisor);
       if (savedDashboard.manager) params.set('manager', savedDashboard.manager);
@@ -58,12 +61,13 @@ export function FilterBar({
   const pushAndSave = useCallback((params: URLSearchParams) => {
     router.push(`${pathname}?${params.toString()}`);
     setDashboard({
-      week: params.get('week') || weekStart,
+      start: params.get('start') || start,
+      end: params.get('end') || end,
       dept: params.get('dept') || '',
       supervisor: params.get('supervisor') || '',
       manager: params.get('manager') || '',
     });
-  }, [router, pathname, weekStart, setDashboard]);
+  }, [router, pathname, start, end, setDashboard]);
 
   // Cascade: when a dept is selected, narrow supervisors and managers to those
   // who appear in at least one employee row in that department.
@@ -118,10 +122,10 @@ export function FilterBar({
     [searchParams, combinations, selectedSupervisor, selectedManager, pushAndSave],
   );
 
-  const setWeek = (date: string) => {
-    if (!date) return;
+  const setRange = (r: { start: string; end: string }) => {
     const params = new URLSearchParams(searchParams.toString());
-    params.set('week', toWeekStart(date));
+    params.set('start', r.start);
+    params.set('end', r.end);
     pushAndSave(params);
   };
 
@@ -130,7 +134,7 @@ export function FilterBar({
   return (
     <div className="bg-white border-b border-border px-4 md:px-6 py-3 flex items-center gap-4 md:gap-6 flex-wrap">
       <h1 className="text-[15px] font-semibold text-app-text tracking-tight mr-2">
-        {formatPeriod(weekStart, addDays(weekStart, 6))}
+        {formatPeriod(start, end)}
       </h1>
       {latestDateLabel && (
         <span className="hidden md:inline text-[11.5px] text-muted ml-auto">
@@ -146,22 +150,7 @@ export function FilterBar({
       </button>
 
       <div className={`${filtersOpen ? 'flex flex-wrap gap-x-4 gap-y-2 w-full' : 'hidden'} md:contents`}>
-      <div className="flex items-center gap-1.5">
-        <span className={`${LABEL_CLS} mr-0.5`}>Week</span>
-        <button type="button" onClick={() => setWeek(addDays(weekStart, -7))} aria-label="Previous week" className={NAV_BTN_CLS}>
-          ‹
-        </button>
-        <input
-          type="date"
-          value={weekStart}
-          onChange={(e) => setWeek(e.target.value)}
-          aria-label="Pick any day in the week"
-          className={SELECT_CLS}
-        />
-        <button type="button" onClick={() => setWeek(addDays(weekStart, 7))} aria-label="Next week" className={NAV_BTN_CLS}>
-          ›
-        </button>
-      </div>
+      <DateRangeControls start={start} end={end} lastWeek={lastWeek} monthOptions={monthOptions} onChange={setRange} />
 
       <div className="flex items-center gap-2">
         <span className={LABEL_CLS}>Dept</span>

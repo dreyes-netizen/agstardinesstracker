@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   addDays, weekStart, weekEnd, monthEnd, lastCompleteWeekStart, formatPeriod, isValidNtePeriod,
-  WEEKLY_NTE_START,
+  WEEKLY_NTE_START, buildMonthOptions,
 } from '@/lib/utils/week';
 
 describe('addDays', () => {
@@ -81,5 +81,19 @@ describe('isValidNtePeriod', () => {
 
   it('rejects malformed dates', () => {
     expect(isValidNtePeriod('2026-9-28', '2026-10-04')).toBe(false);
+  });
+});
+
+describe('buildMonthOptions', () => {
+  it('prepends All time spanning the oldest to newest month', () => {
+    expect(buildMonthOptions(['2026-10', '2026-09'])).toEqual([
+      { label: 'All time', start: '2026-09-01', end: '2026-10-31' },
+      { label: 'October 2026', start: '2026-10-01', end: '2026-10-31' },
+      { label: 'September 2026', start: '2026-09-01', end: '2026-09-30' },
+    ]);
+  });
+
+  it('is empty without data', () => {
+    expect(buildMonthOptions([])).toEqual([]);
   });
 });

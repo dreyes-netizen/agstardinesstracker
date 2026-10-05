@@ -7,7 +7,7 @@ import type { EmployeeStats, EmployeeLateRecord } from '@/lib/queries/attendance
 import { NteForm } from './NteForm';
 import { LateAdjustForm } from './LateAdjustForm';
 import { formatDate } from '@/lib/utils/date';
-import { formatPeriod } from '@/lib/utils/week';
+import { formatPeriod, monthEnd } from '@/lib/utils/week';
 
 interface EmployeeDrawerProps {
   employee: EmployeeStats | null;
@@ -47,7 +47,10 @@ export function EmployeeDrawer({ employee, periodStart, periodEnd, isAdmin = fal
     setLoading(true);
     setFetchError(false);
     fetch(`/api/employee/${employee.employeeId}/lates?start=${periodStart}&end=${periodEnd}`, { signal: controller.signal })
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then((data: EmployeeLateRecord[]) => setLateRecords(data))
       .catch((err) => { if (err.name !== 'AbortError') setFetchError(true); })
       .finally(() => setLoading(false));
@@ -95,7 +98,7 @@ export function EmployeeDrawer({ employee, periodStart, periodEnd, isAdmin = fal
               </div>
             </div>
             <p className="text-[11.5px] text-muted mt-2.5">
-              Month to date: <span className="font-mono font-medium text-app-text">{employee.mtdLates}× · {employee.mtdMinutes} min</span>
+              {formatPeriod(`${periodEnd.slice(0, 7)}-01`, monthEnd(periodEnd))} so far: <span className="font-mono font-medium text-app-text">{employee.mtdLates}× · {employee.mtdMinutes} min</span>
               <span className="text-muted/80"> (NTE at 6 lates or 60 min)</span>
             </p>
           </div>
@@ -190,21 +193,32 @@ export function EmployeeDrawer({ employee, periodStart, periodEnd, isAdmin = fal
             )}
           </div>
 
-          {['required', 'issued', 'acknowledged'].includes(employee.nteStatus) && (
+          {employee.ntes.length > 0 && (
             <div className="px-[22px] py-4">
-              <p className="text-[11px] font-semibold text-muted mb-3">NTE Action</p>
-              <NteForm
-                employeeId={employee.employeeId}
-                periodStart={periodStart}
-                periodEnd={periodEnd}
-                nteStatus={employee.nteStatus}
-                issuedDate={employee.issuedDate}
-                issuedBy={employee.issuedBy}
-                acknowledgedDate={employee.acknowledgedDate}
-                notes={null}
-                isAdmin={isAdmin}
-                onSuccess={onNteAction}
-              />
+              <p className="text-[11px] font-semibold text-muted mb-3">
+                NTE Action{employee.ntes.length > 1 ? `s (${employee.ntes.length})` : ''}
+              </p>
+              <div className="space-y-4">
+                {employee.ntes.map((n) => (
+                  <div key={n.periodStart} className={employee.ntes.length > 1 ? 'border-t border-border pt-3 first:border-t-0 first:pt-0' : ''}>
+                    {employee.ntes.length > 1 && (
+                      <p className="text-[12px] font-medium text-app-text mb-2">{formatPeriod(n.periodStart, n.periodEnd)}</p>
+                    )}
+                    <NteForm
+                      employeeId={employee.employeeId}
+                      periodStart={n.periodStart}
+                      periodEnd={n.periodEnd}
+                      nteStatus={n.status}
+                      issuedDate={n.issuedDate}
+                      issuedBy={n.issuedBy}
+                      acknowledgedDate={n.acknowledgedDate}
+                      notes={n.notes}
+                      isAdmin={isAdmin}
+                      onSuccess={onNteAction}
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

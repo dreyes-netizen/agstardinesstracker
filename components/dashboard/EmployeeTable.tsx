@@ -6,7 +6,7 @@ import {
   flexRender, createColumnHelper, SortingState, PaginationState,
 } from '@tanstack/react-table';
 import { EmployeeStats } from '@/lib/queries/attendance';
-import { addDays, formatPeriod } from '@/lib/utils/week';
+import { formatPeriod } from '@/lib/utils/week';
 import { StatusBadge } from './StatusBadge';
 import { EmployeeDrawer } from './EmployeeDrawer';
 
@@ -41,7 +41,7 @@ const columns = [
     cell: (info) => <span className="text-muted text-[12px]">{info.getValue() ?? '—'}</span>,
   }),
   col.accessor('lateCount', {
-    header: () => <span className="block text-right">Week Lates</span>,
+    header: () => <span className="block text-right">Lates</span>,
     cell: (info) => (
       <span className="font-mono text-[13px] block text-right">
         {info.getValue()} <span className="text-[10px] text-muted">×</span>
@@ -49,7 +49,7 @@ const columns = [
     ),
   }),
   col.accessor('accumulatedMinutes', {
-    header: () => <span className="block text-right">Week Min</span>,
+    header: () => <span className="block text-right">Late Min</span>,
     meta: hide,
     cell: (info) => (
       <span className="font-mono text-[13px] block text-right">
@@ -70,13 +70,21 @@ const columns = [
   }),
   col.accessor('nteStatus', {
     header: 'Status',
-    cell: (info) => <StatusBadge status={info.getValue()} />,
+    cell: ({ row }) => (
+      <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+        <StatusBadge status={row.original.nteStatus} />
+        {row.original.ntes.length > 1 && (
+          <span className="text-[11px] text-muted">{row.original.ntes.length} NTEs</span>
+        )}
+      </span>
+    ),
   }),
 ];
 
 interface EmployeeTableProps {
   data: EmployeeStats[];
-  weekStart: string;
+  start: string;
+  end: string;
   dept?: string;
   supervisor?: string;
   manager?: string;
@@ -88,7 +96,7 @@ function escCsv(v: string | number | null | undefined): string {
   return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
-export function EmployeeTable({ data, weekStart, dept, supervisor, manager, isAdmin }: EmployeeTableProps) {
+export function EmployeeTable({ data, start, end, dept, supervisor, manager, isAdmin }: EmployeeTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 50 });
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -115,7 +123,7 @@ export function EmployeeTable({ data, weekStart, dept, supervisor, manager, isAd
   }, [data, search, hideZero, statusFilter]);
 
   function exportCsv() {
-    const periodLabel = formatPeriod(weekStart, addDays(weekStart, 6));
+    const periodLabel = formatPeriod(start, end);
     const rows: string[][] = [
       ['Period', periodLabel],
       ['Department', dept || 'All'],
@@ -123,7 +131,7 @@ export function EmployeeTable({ data, weekStart, dept, supervisor, manager, isAd
       ['Manager', manager || 'All'],
       ['Records exported', String(filtered.length)],
       [],
-      ['Employee ID', 'Last Name', 'First Name', 'Middle Name', 'Department', 'Supervisor', 'Manager', 'Week Lates', 'Week Minutes (min)', 'Month-to-date Lates', 'Month-to-date Minutes (min)', 'NTE Status'],
+      ['Employee ID', 'Last Name', 'First Name', 'Middle Name', 'Department', 'Supervisor', 'Manager', 'Late Count', 'Late Minutes (min)', 'Month-to-date Lates', 'Month-to-date Minutes (min)', 'NTE Status', 'NTEs in Period'],
       ...filtered.map((e) => [
         e.employeeId,
         e.lastName,
@@ -137,6 +145,7 @@ export function EmployeeTable({ data, weekStart, dept, supervisor, manager, isAd
         String(e.mtdLates),
         String(e.mtdMinutes),
         e.nteStatus,
+        String(e.ntes.length),
       ]),
     ];
     const csv = rows.map((r) => r.map(escCsv).join(',')).join('\r\n');
@@ -144,7 +153,7 @@ export function EmployeeTable({ data, weekStart, dept, supervisor, manager, isAd
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `tardiness-week-${weekStart}.csv`;
+    a.download = `tardiness-${start}-to-${end}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -292,8 +301,8 @@ export function EmployeeTable({ data, weekStart, dept, supervisor, manager, isAd
 
       <EmployeeDrawer
         employee={selected}
-        periodStart={weekStart}
-        periodEnd={addDays(weekStart, 6)}
+        periodStart={start}
+        periodEnd={end}
         isAdmin={isAdmin}
         onClose={() => setSelected(null)}
         onNteAction={() => setSelected(null)}
